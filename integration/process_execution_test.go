@@ -50,7 +50,7 @@ func TestProcessExecution(t *testing.T) {
 
 	iopts := instrument.NewOptions()
 	// create listener, get free port from OS
-	l, _ := net.Listen("tcp", ":0")
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	defer l.Close()
 
 	// create operator agent
