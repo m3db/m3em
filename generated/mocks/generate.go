@@ -25,6 +25,8 @@
 
 // mockgen rules for generating mocks for exported interfaces (reflection mode)
 // go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/environment_mock.go github.com/m3db/m3em/environment M3DBInstance,M3DBEnvironment,Options"
+// sed -i -e 's/environment\.//g'
+//				-e 's/vendor...//g'
 // TODO(prateek): ^ needs some hacky sed magic
 
 // example run: PACKAGE=github.com/m3db/m3em go generate ./generated/mocks/generate.go

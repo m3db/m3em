@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
+	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -181,4 +182,27 @@ func TestServiceInstanceSetupBuildVerify(t *testing.T) {
 	mcp := build.NewMockServiceConfiguration(ctrl)
 	require.NoError(t, m3dbInstance.OverrideConfiguration(mcp))
 	require.Equal(t, mcp, inst.currentConf)
+}
+
+func TestHealthEndpoint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockM3DBClient := m3dbrpc.NewMockTChanNode(ctrl)
+	mockM3DBClient.EXPECT().Health(gomock.Any()).Return(&m3dbrpc.NodeHealthResult_{
+		Bootstrapped: true,
+		Ok:           false,
+		Status:       "NOT_OK",
+	}, nil)
+
+	opts := newDefaultOptions()
+	mockInstance := newMockServiceInstance(ctrl)
+	mockOperator := newMockOperator(ctrl)
+	m3dbInstance := NewM3DBInstance(mockInstance.ID(), mockOperator, opts).(*m3dbInst)
+	m3dbInstance.m3dbClient = mockM3DBClient
+
+	health, err := m3dbInstance.Health()
+	require.NoError(t, err)
+	require.True(t, health.Bootstrapped)
+	require.False(t, health.OK)
+	require.Equal(t, "NOT_OK", health.Status)
 }

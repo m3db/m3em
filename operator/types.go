@@ -32,7 +32,7 @@ import (
 type Operator interface {
 	// Setup sets up the remote host with resources required to execute a test build
 	// NB(prateek): `force` is used to determine if any existing resources (e.g. existing files, running
-	// processes) on the remote host should be stamped on.
+	// processes) on the remote host may be trampled.
 	Setup(
 		build build.ServiceBuild,
 		config build.ServiceConfiguration,
