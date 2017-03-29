@@ -1,30 +1,39 @@
 package: github.com/m3db/m3em
 import:
 - package: github.com/golang/mock
+  version: bd3c8e81be01eef76d4b503f5e687d2d1354d2d9
   subpackages:
   - gomock
 - package: github.com/golang/protobuf
+  version: 3852dcfda249c2097355a6aabb199a28d97b30df
   subpackages:
   - proto
 - package: github.com/m3db/m3cluster
+  version: 1054ce5875f3f13519cfc1c4e816c06bab8587fe
   subpackages:
   - services
   - shard
 - package: github.com/m3db/m3db
+  version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
   subpackages:
   - client
 - package: github.com/m3db/m3x
+  version: 3a8328d65b7880b034b8515177921023b41e4399
   subpackages:
   - errors
   - instrument
   - log
 - package: github.com/stretchr/testify
+  version: d77da356e56a7428ad25149ca77381849a6a5232
   subpackages:
   - require
 - package: github.com/uber-go/tally
+  version: 08e86c3c1eb55364d563bd6beb982040225f4bb7
 - package: golang.org/x/net
+  version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:
   - context
 - package: google.golang.org/grpc
+  version: cdee119ee21e61eef7093a41ba148fa83585e143
   subpackages:
   - codes
