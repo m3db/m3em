@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package m3em;
+
+service Operator {
+	// rpc CleanDataDirectory(CleanDataDirectoryRequest) returns (CleanDataDirectoryResponse);
+  rpc Setup(SetupRequest)              returns (SetupResponse);
+	rpc Transfer(stream TransferRequest) returns (TransferResponse);
+	rpc Start(StartRequest)              returns (StartResponse);
+	rpc Stop(StopRequest)                returns (StopResponse);
+	rpc Teardown(TeardownRequest)        returns (TeardownResponse);
+}
+
+enum FileType {
+  UNKNOWN     = 0;
+  M3DB_BINARY = 1;
+  M3DB_CONFIG = 2;
+  // log file
+}
+
+message SetupRequest {
+  string token = 1;
+  bool   force = 2;
+  // TODO(prateek): heartbeat endpoint
+}
+
+message SetupResponse {
+}
+
+message TransferRequest {
+  FileType type          = 1;
+  string   filename      = 2;
+  bool     overwrite     = 3;
+  int32    chunk_idx     = 4;
+  bytes    chunk_bytes   = 5;
+}
+
+message TransferResponse {
+  uint32 file_checksum    = 1;
+  int32  num_chunks_recvd = 2;
+}
+
+message StartRequest {
+}
+
+message StartResponse {
+}
+
+message StopRequest {
+}
+
+message StopResponse {
+}
+
+message TeardownRequest {
+}
+
+message TeardownResponse {
+}
+
+message CleanDataDirectoryRequest {
+}
+
+message CleanDataDirectoryResponse {
+}

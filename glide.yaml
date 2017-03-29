@@ -1,0 +1,30 @@
+package: github.com/m3db/m3em
+import:
+- package: github.com/golang/mock
+  subpackages:
+  - gomock
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
+- package: github.com/m3db/m3cluster
+  subpackages:
+  - services
+  - shard
+- package: github.com/m3db/m3db
+  subpackages:
+  - client
+- package: github.com/m3db/m3x
+  subpackages:
+  - errors
+  - instrument
+  - log
+- package: github.com/stretchr/testify
+  subpackages:
+  - require
+- package: github.com/uber-go/tally
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: google.golang.org/grpc
+  subpackages:
+  - codes

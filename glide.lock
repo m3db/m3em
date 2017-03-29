@@ -1,0 +1,116 @@
+hash: 661b61df46558b61597ccabff4dcb377f02b35e682ac77b4781698df57c18ad8
+updated: 2017-03-28T21:25:01.260615221-04:00
+imports:
+- name: github.com/apache/thrift
+  version: 53dd39833a08ce33582e5ff31fa18bb4735d6731
+  subpackages:
+  - lib/go/thrift
+- name: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  subpackages:
+  - spew
+- name: github.com/facebookgo/clock
+  version: 600d898af40aa09a7a93ecb9265d87b0504b6f03
+- name: github.com/golang/mock
+  version: bd3c8e81be01eef76d4b503f5e687d2d1354d2d9
+  subpackages:
+  - gomock
+- name: github.com/golang/protobuf
+  version: 3852dcfda249c2097355a6aabb199a28d97b30df
+  subpackages:
+  - proto
+- name: github.com/m3db/m3cluster
+  version: 1054ce5875f3f13519cfc1c4e816c06bab8587fe
+  subpackages:
+  - client
+  - kv
+  - services
+  - services/placement
+  - shard
+- name: github.com/m3db/m3db
+  version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
+  subpackages:
+  - client
+  - clock
+  - context
+  - digest
+  - encoding
+  - encoding/m3tsz
+  - generated/thrift/rpc
+  - network/server/tchannelthrift/convert
+  - network/server/tchannelthrift/errors
+  - network/server/tchannelthrift/node/channel
+  - retention
+  - sharding
+  - storage/block
+  - storage/bootstrap/result
+  - topology
+  - ts
+  - x/io
+- name: github.com/m3db/m3x
+  version: 3a8328d65b7880b034b8515177921023b41e4399
+  subpackages:
+  - checked
+  - clock
+  - close
+  - errors
+  - instrument
+  - log
+  - pool
+  - retry
+  - sync
+  - time
+  - watch
+- name: github.com/opentracing/opentracing-go
+  version: 855519783f479520497c6b3445611b05fc42f009
+  subpackages:
+  - ext
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
+- name: github.com/spaolacci/murmur3
+  version: 0d12bf811670bf6a1a63828dfbd003eded177fce
+- name: github.com/stretchr/testify
+  version: d77da356e56a7428ad25149ca77381849a6a5232
+  subpackages:
+  - assert
+  - require
+- name: github.com/uber-go/atomic
+  version: e682c1008ac17bf26d2e4b5ad6cdd08520ed0b22
+- name: github.com/uber-go/tally
+  version: 08e86c3c1eb55364d563bd6beb982040225f4bb7
+- name: github.com/uber/tchannel-go
+  version: 8d570ed87acb2661d390c096215260f3f9e9b931
+  subpackages:
+  - relay
+  - thrift
+  - thrift/gen-go/meta
+  - tnet
+  - trand
+  - typed
+- name: golang.org/x/net
+  version: 61557ac0112b576429a0df080e1c2cef5dfbb642
+  subpackages:
+  - context
+  - http2
+  - http2/hpack
+  - idna
+  - internal/timeseries
+  - lex/httplex
+  - trace
+- name: google.golang.org/grpc
+  version: cdee119ee21e61eef7093a41ba148fa83585e143
+  subpackages:
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - keepalive
+  - metadata
+  - naming
+  - peer
+  - stats
+  - tap
+  - transport
+testImports: []
