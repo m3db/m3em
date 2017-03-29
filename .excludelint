@@ -1,4 +1,5 @@
 (vendor/)
 (mock_.*.go)
-(*.pb.go)
+(.*_mock.go)
+(.*.pb.go)
 (generated/)
