@@ -21,6 +21,7 @@
 package exec
 
 import (
+	"context"
 	"fmt"
 	"os"
 	oexec "os/exec"
@@ -90,14 +91,15 @@ type startFn func()
 
 type processMonitor struct {
 	sync.Mutex
-	cmd      *oexec.Cmd
-	stdoutFd *os.File
-	stderrFd *os.File
-	startFn  startFn
-	listener ProcessListener
-	err      error
-	running  bool
-	done     bool
+	cmd        *oexec.Cmd
+	cancelFunc context.CancelFunc
+	stdoutFd   *os.File
+	stderrFd   *os.File
+	startFn    startFn
+	listener   ProcessListener
+	err        error
+	running    bool
+	done       bool
 }
 
 // NewProcessMonitor creates a new ProcessMonitor
@@ -127,17 +129,19 @@ func NewProcessMonitor(cmd Cmd, pl ProcessListener) (ProcessMonitor, error) {
 		return nil, fmt.Errorf("unable to open stderr writer: %v", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	ocmd := oexec.CommandContext(ctx, cmd.Path)
+	ocmd.Args = cmd.Args
+	ocmd.Dir = cmd.OutputDir
+	ocmd.Stderr = stderrWriter
+	ocmd.Stdout = stdoutWriter
+
 	pm := &processMonitor{
-		listener: pl,
-		stdoutFd: stdoutWriter,
-		stderrFd: stderrWriter,
-		cmd: &oexec.Cmd{
-			Path:   cmd.Path,
-			Args:   cmd.Args,
-			Dir:    cmd.OutputDir,
-			Stdout: stdoutWriter,
-			Stderr: stderrWriter,
-		},
+		listener:   pl,
+		stdoutFd:   stdoutWriter,
+		stderrFd:   stderrWriter,
+		cancelFunc: cancel,
+		cmd:        ocmd,
 	}
 	pm.startFn = pm.startAsync
 
@@ -187,7 +191,7 @@ func (pm *processMonitor) startAndWait() {
 	pm.running = true
 	pm.Unlock()
 
-	if err := pm.cmd.Start(); err != nil {
+	if err := pm.cmd.Run(); err != nil {
 		pm.Lock()
 		pm.err = err
 		pm.running = false
@@ -196,16 +200,9 @@ func (pm *processMonitor) startAndWait() {
 		return
 	}
 
-	if err := pm.cmd.Wait(); err != nil {
-		pm.Lock()
-		pm.err = err
-		pm.running = false
-		pm.Unlock()
-		pm.notifyListener(err)
-		return
-	}
-
+	pm.Lock()
 	pm.running = false
+	pm.Unlock()
 	pm.notifyListener(nil)
 }
 
@@ -228,10 +225,8 @@ func (pm *processMonitor) stopWithLock() error {
 		return errUnableToStopStoped
 	}
 
-	pm.running = false
-	pm.err = pm.cmd.Process.Kill()
-	pm.notifyListener(pm.err)
-	return pm.err
+	pm.cancelFunc()
+	return nil
 }
 
 func (pm *processMonitor) Running() bool {
