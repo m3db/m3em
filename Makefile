@@ -17,8 +17,26 @@ BUILD := $(abspath ./out)
 LINUX_AMD64_ENV := GOOS=linux GOARCH=amd64 CGO_ENABLED=0
 VENDOR_ENV := GO15VENDOREXPERIMENT=1
 
+SERVICES :=  \
+	m3em_agent \
+
 setup:
 	mkdir -p $(BUILD)
+
+define SERVICE_RULES
+$(SERVICE): setup
+	@echo Building $(SERVICE)
+	$(VENDOR_ENV) go build -o $(BUILD)/$(SERVICE) ./services/$(SERVICE)/.
+
+prod-$(SERVICE):
+	$(LINUX_AMD64_ENV) make $(SERVICE)
+endef
+
+services: $(SERVICES)
+prod-services:
+	$(LINUX_AMD64_ENV) make services
+
+$(foreach SERVICE,$(SERVICES),$(eval $(SERVICE_RULES)))
 
 lint:
 	@which golint > /dev/null || go get -u github.com/golang/lint/golint

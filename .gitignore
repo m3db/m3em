@@ -1,3 +1,6 @@
+# Build Output
+out/
+
 # Glide dependencies
 vendor/
 
