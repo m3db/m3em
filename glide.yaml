@@ -17,23 +17,35 @@ import:
   version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
   subpackages:
   - client
+- package: github.com/m3db/m3nsch
+  version: fe997544b7bf99969f434af8dde1a23bc2e04b5d
+  subpackages:
+  - m3nsch_server/tcp
 - package: github.com/m3db/m3x
   version: 3a8328d65b7880b034b8515177921023b41e4399
   subpackages:
   - errors
   - instrument
   - log
+- package: github.com/pborman/getopt
+  version: ec82d864f599c39673eef89f91b93fa5576567a1
+- package: github.com/spf13/viper
+  version: 7538d73b4eb9511d85a9f1dfef202eeb8ac260f4
 - package: github.com/stretchr/testify
   version: d77da356e56a7428ad25149ca77381849a6a5232
   subpackages:
   - require
 - package: github.com/uber-go/tally
-  version: 08e86c3c1eb55364d563bd6beb982040225f4bb7
+  version: v1.1.0
+  subpackages:
+  - m3
 - package: golang.org/x/net
   version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:
   - context
 - package: google.golang.org/grpc
-  version: cdee119ee21e61eef7093a41ba148fa83585e143
+  version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
   subpackages:
   - codes
+- package: gopkg.in/validator.v2
+  version: 3e4f037f12a1221a0864cf0dd2e81c452ab22448
