@@ -24,15 +24,14 @@
 package environment
 
 import (
-	time "time"
-
-	build "github.com/m3db/m3em/build"
-	operator "github.com/m3db/m3em/operator"
-
 	gomock "github.com/golang/mock/gomock"
-	"github.com/m3db/m3cluster/services"
-	"github.com/m3db/m3cluster/shard"
-	"github.com/m3db/m3x/instrument"
+	build "github.com/m3db/m3em/build"
+
+	operator "github.com/m3db/m3em/operator"
+	services "github.com/m3db/m3cluster/services"
+	shard "github.com/m3db/m3cluster/shard"
+	instrument "github.com/m3db/m3x/instrument"
+	time "time"
 )
 
 // Mock of M3DBInstance interface
@@ -64,6 +63,17 @@ func (_m *MockM3DBInstance) Endpoint() string {
 
 func (_mr *_MockM3DBInstanceRecorder) Endpoint() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Endpoint")
+}
+
+func (_m *MockM3DBInstance) Health() (M3DBInstanceHealth, error) {
+	ret := _m.ctrl.Call(_m, "Health")
+	ret0, _ := ret[0].(M3DBInstanceHealth)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockM3DBInstanceRecorder) Health() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Health")
 }
 
 func (_m *MockM3DBInstance) ID() string {

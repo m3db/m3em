@@ -5,9 +5,10 @@ import:
   subpackages:
   - gomock
 - package: github.com/golang/protobuf
-  version: 3852dcfda249c2097355a6aabb199a28d97b30df
+  version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
   subpackages:
   - proto
+  - protoc-gen-go
 - package: github.com/m3db/m3cluster
   version: 1054ce5875f3f13519cfc1c4e816c06bab8587fe
   subpackages:
@@ -17,6 +18,8 @@ import:
   version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
   subpackages:
   - client
+  - generated/thrift/rpc
+  - network/server/tchannelthrift/node/channel
 - package: github.com/m3db/m3nsch
   version: fe997544b7bf99969f434af8dde1a23bc2e04b5d
   subpackages:
@@ -27,6 +30,7 @@ import:
   - errors
   - instrument
   - log
+  - retry
 - package: github.com/pborman/getopt
   version: ec82d864f599c39673eef89f91b93fa5576567a1
 - package: github.com/spf13/viper
@@ -39,6 +43,10 @@ import:
   version: v1.1.0
   subpackages:
   - m3
+- package: github.com/uber/tchannel-go
+  version: 8d570ed87acb2661d390c096215260f3f9e9b931
+  subpackages:
+  - thrift
 - package: golang.org/x/net
   version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:

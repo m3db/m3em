@@ -24,10 +24,8 @@
 //go:generate sh -c "mockgen -package=cluster -destination=$GOPATH/src/$PACKAGE/cluster/cluster_mock.go -source=$GOPATH/src/$PACKAGE/cluster/types.go"
 
 // mockgen rules for generating mocks for exported interfaces (reflection mode)
-// go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/environment_mock.go github.com/m3db/m3em/environment M3DBInstance,M3DBEnvironment,Options"
-// TODO(prateek): ^ needs some hacky sed magic
-
-// example run: PACKAGE=github.com/m3db/m3em go generate ./generated/mocks/generate.go
-// TODO(prateek): make this part of the Makefile once we OSSify
+//go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/environment_mock.go github.com/m3db/m3em/environment M3DBInstance,M3DBEnvironment,Options"
+//go:generate sed -i "" -e s@environment\.@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
+//go:generate sed -i "" s@.*environment.*github.com.*@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
 
 package generated

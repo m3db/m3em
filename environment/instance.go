@@ -23,12 +23,18 @@ package environment
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/operator"
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3cluster/shard"
+	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
+	m3dbchannel "github.com/m3db/m3db/network/server/tchannelthrift/node/channel"
+	xretry "github.com/m3db/m3x/retry"
+	tchannel "github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 var (
@@ -42,17 +48,18 @@ var (
 
 type m3dbInst struct {
 	sync.Mutex
+	opts         Options
 	id           string
 	rack         string
 	zone         string
 	weight       uint32
 	endpoint     string
 	shards       shard.Shards
-	operator     operator.Operator
-	opts         Options
+	status       InstanceStatus
 	currentBuild build.ServiceBuild
 	currentConf  build.ServiceConfiguration
-	status       InstanceStatus
+	operator     operator.Operator
+	m3dbClient   m3dbrpc.TChanNode
 }
 
 // NewM3DBInstance returns a new M3DBInstance.
@@ -259,4 +266,61 @@ func (i *m3dbInst) Status() InstanceStatus {
 
 func (i *m3dbInst) Operator() operator.Operator {
 	return i.operator
+}
+
+func newThriftClient(tchannelEndpoint string) (m3dbrpc.TChanNode, error) {
+	channel, err := tchannel.NewChannel("Client", nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not create new tchannel channel: %v", err)
+	}
+	endpoint := &thrift.ClientOptions{HostPort: tchannelEndpoint}
+	thriftClient := thrift.NewClient(channel, m3dbchannel.ChannelName, endpoint)
+	client := m3dbrpc.NewTChanNodeClient(thriftClient)
+	return client, nil
+}
+
+func (i *m3dbInst) thriftClient() (m3dbrpc.TChanNode, error) {
+	i.Lock()
+	defer i.Unlock()
+	if i.m3dbClient != nil {
+		return i.m3dbClient, nil
+	}
+
+	client, err := newThriftClient(i.endpoint)
+	if err != nil {
+		return nil, err
+	}
+	i.m3dbClient = client
+	return i.m3dbClient, nil
+}
+
+func (i *m3dbInst) Health() (M3DBInstanceHealth, error) {
+	healthResult := M3DBInstanceHealth{}
+
+	client, err := i.thriftClient()
+	if err != nil {
+		return healthResult, err
+	}
+
+	attemptFn := func() error {
+		tctx, _ := thrift.NewContext(i.opts.InstanceOperationTimeout())
+		result, err := client.Health(tctx)
+		if err != nil {
+			return err
+		}
+		healthResult.Bootstrapped = result.GetBootstrapped()
+		healthResult.OK = result.GetOk()
+		healthResult.Status = result.GetStatus()
+		return nil
+	}
+
+	// TODO(prateek): move xretry.Options into environment.Options
+	retrier := xretry.NewRetrier(xretry.NewOptions().
+		SetBackoffFactor(2).
+		SetMaxRetries(3).
+		SetInitialBackoff(time.Second).
+		SetJitter(true))
+
+	err = retrier.Attempt(attemptFn)
+	return healthResult, err
 }

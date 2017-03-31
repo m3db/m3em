@@ -30,8 +30,6 @@ import (
 	"github.com/m3db/m3x/instrument"
 )
 
-// TODO(prateek): 'transitioning' status
-
 // InstanceStatus indicates the different states a ServiceInstance can be in. The
 // state diagram below describes the transitions between the various states:
 //
@@ -109,11 +107,21 @@ type M3DBInstance interface {
 	// Operator returns the `Operator` for this ServiceInstance.
 	Operator() operator.Operator
 
+	// Health returns the health for this ServiceInstance
+	Health() (M3DBInstanceHealth, error)
+
 	// TODO(prateek):
-	// - query service observable properties (nowFn, health, detailed_status)
+	// - query service observable properties (nowFn, detailed_status)
 	// - set nowFn offset
 	// - logs
 	// - metrics
+}
+
+// M3DBInstanceHealth provides M3DBInstance Health
+type M3DBInstanceHealth struct {
+	Bootstrapped bool
+	Status       string
+	OK           bool
 }
 
 // M3DBInstances is a collection of M3DBInstance(s)
