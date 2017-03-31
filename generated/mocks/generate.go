@@ -28,7 +28,4 @@
 //go:generate sed -i "" -e s@environment\.@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
 //go:generate sed -i "" s@.*environment.*github.com.*@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
 
-// example run: PACKAGE=github.com/m3db/m3em go generate ./generated/mocks/generate.go
-// TODO(prateek): make this part of the Makefile once we OSSify
-
 package generated
