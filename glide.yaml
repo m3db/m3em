@@ -5,9 +5,10 @@ import:
   subpackages:
   - gomock
 - package: github.com/golang/protobuf
-  version: 3852dcfda249c2097355a6aabb199a28d97b30df
+  version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
   subpackages:
   - proto
+  - protoc-gen-go
 - package: github.com/m3db/m3cluster
   version: 1054ce5875f3f13519cfc1c4e816c06bab8587fe
   subpackages:

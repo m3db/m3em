@@ -1,5 +1,5 @@
-hash: 0ce9c625d8debb02f73277f211bc6d0ee501bc99caf4e58dd99dd6afd64494c2
-updated: 2017-03-29T19:13:04.639706948-04:00
+hash: b15492adf10f0e76c2b6cab8fd1f316409987fc5da29c2e5b287dcfb26dc0eae
+updated: 2017-03-31T15:47:01.011128251-04:00
 imports:
 - name: github.com/apache/thrift
   version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
@@ -18,9 +18,10 @@ imports:
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
-  version: 3852dcfda249c2097355a6aabb199a28d97b30df
+  version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
   subpackages:
   - proto
+  - protoc-gen-go
 - name: github.com/hashicorp/hcl
   version: 630949a3c5fa3c613328e1b8256052cbc2327c9b
   subpackages:
