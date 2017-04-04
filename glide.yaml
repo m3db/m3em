@@ -20,10 +20,6 @@ import:
   - client
   - generated/thrift/rpc
   - network/server/tchannelthrift/node/channel
-- package: github.com/m3db/m3nsch
-  version: fe997544b7bf99969f434af8dde1a23bc2e04b5d
-  subpackages:
-  - m3nsch_server/tcp
 - package: github.com/m3db/m3x
   version: 3a8328d65b7880b034b8515177921023b41e4399
   subpackages:

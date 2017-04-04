@@ -28,8 +28,8 @@ import (
 
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/generated/proto/m3em"
+	"github.com/m3db/m3em/services/m3em_agent/tcp"
 
-	"github.com/m3db/m3nsch/m3nsch_server/tcp"
 	"github.com/m3db/m3x/instrument"
 
 	xlog "github.com/m3db/m3x/log"
