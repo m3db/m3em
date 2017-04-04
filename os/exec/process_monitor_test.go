@@ -74,7 +74,7 @@ func TestSimpleExec(t *testing.T) {
 	require.NoError(t, err)
 	pmStruct, ok := pm.(*processMonitor)
 	require.True(t, ok)
-	pmStruct.startFn = pmStruct.startAndWait
+	pmStruct.startFn = pmStruct.startSync
 	require.NoError(t, pm.Start())
 	require.NoError(t, pm.Err())
 	require.True(t, success)
@@ -123,7 +123,7 @@ echo -ne "testing random output"`)
 	require.NoError(t, err)
 	pmStruct, ok := pm.(*processMonitor)
 	require.True(t, ok)
-	pmStruct.startFn = pmStruct.startAndWait
+	pmStruct.startFn = pmStruct.startSync
 	require.NoError(t, pm.Start())
 	require.NoError(t, pm.Err())
 	require.True(t, success)
@@ -163,7 +163,7 @@ func TestStderrOutput(t *testing.T) {
 	require.NoError(t, err)
 	pmStruct, ok := pm.(*processMonitor)
 	require.True(t, ok)
-	pmStruct.startFn = pmStruct.startAndWait
+	pmStruct.startFn = pmStruct.startSync
 	require.NoError(t, pm.Start())
 	require.NoError(t, pm.Err())
 	require.True(t, success)
@@ -204,7 +204,7 @@ func TestFailingExec(t *testing.T) {
 	require.NoError(t, err)
 	pmStruct, ok := pm.(*processMonitor)
 	require.True(t, ok)
-	pmStruct.startFn = pmStruct.startAndWait
+	pmStruct.startFn = pmStruct.startSync
 	pm.Start()
 	require.Error(t, pm.Err())
 	require.True(t, success)

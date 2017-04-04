@@ -166,7 +166,6 @@ func (pm *processMonitor) Start() error {
 		return errUnableToStartClosed
 	}
 
-	// TODO(prateek): should we check this?
 	if pm.err != nil {
 		pm.Unlock()
 		return pm.err
@@ -183,27 +182,20 @@ func (pm *processMonitor) Start() error {
 }
 
 func (pm *processMonitor) startAsync() {
-	go pm.startAndWait()
+	go pm.startSync()
 }
 
-func (pm *processMonitor) startAndWait() {
+func (pm *processMonitor) startSync() {
 	pm.Lock()
 	pm.running = true
 	pm.Unlock()
 
-	if err := pm.cmd.Run(); err != nil {
-		pm.Lock()
-		pm.err = err
-		pm.running = false
-		pm.Unlock()
-		pm.notifyListener(err)
-		return
-	}
-
+	err := pm.cmd.Run()
 	pm.Lock()
+	pm.err = err
 	pm.running = false
 	pm.Unlock()
-	pm.notifyListener(nil)
+	pm.notifyListener(err)
 }
 
 func (pm *processMonitor) Stop() error {
