@@ -38,8 +38,8 @@ type opts struct {
 	iopts      instrument.Options
 	workingDir string
 	execGenFn  ExecGenFn
-	initFn     InitHostResourcesFn
-	releaseFn  ReleaseHostResourcesFn
+	initFn     HostResourcesFn
+	releaseFn  HostResourcesFn
 }
 
 // NewOptions constructs new options
@@ -79,20 +79,20 @@ func (o *opts) ExecGenFn() ExecGenFn {
 	return o.execGenFn
 }
 
-func (o *opts) SetInitHostResourcesFn(fn InitHostResourcesFn) Options {
+func (o *opts) SetInitHostResourcesFn(fn HostResourcesFn) Options {
 	o.initFn = fn
 	return o
 }
 
-func (o *opts) InitHostResourcesFn() InitHostResourcesFn {
+func (o *opts) InitHostResourcesFn() HostResourcesFn {
 	return o.initFn
 }
 
-func (o *opts) SetReleaseHostResourcesFn(fn ReleaseHostResourcesFn) Options {
+func (o *opts) SetReleaseHostResourcesFn(fn HostResourcesFn) Options {
 	o.releaseFn = fn
 	return o
 }
 
-func (o *opts) ReleaseHostResourcesFn() ReleaseHostResourcesFn {
+func (o *opts) ReleaseHostResourcesFn() HostResourcesFn {
 	return o.releaseFn
 }

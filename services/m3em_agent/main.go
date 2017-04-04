@@ -132,8 +132,8 @@ func Run() {
 
 	agentOpts := agent.NewOptions(iopts).
 		SetWorkingDirectory(conf.Agent.WorkingDir).
-		SetInitHostResourcesFn(hostInitFnMaker(conf.Agent.StartupCmds, logger)).
-		SetReleaseHostResourcesFn(hostReleaseFnMaker(conf.Agent.ReleaseCmds, logger)).
+		SetInitHostResourcesFn(hostFnMaker("startup", conf.Agent.StartupCmds, logger)).
+		SetReleaseHostResourcesFn(hostFnMaker("release", conf.Agent.ReleaseCmds, logger)).
 		SetExecGenFn(execGenFn)
 
 	agentService, err := agent.New(agentOpts)
@@ -148,35 +148,15 @@ func Run() {
 	}
 }
 
-func hostInitFnMaker(cmds []execCommand, logger xlog.Logger) agent.InitHostResourcesFn {
+func hostFnMaker(mode string, cmds []execCommand, logger xlog.Logger) agent.HostResourcesFn {
 	return func() error {
 		if len(cmds) == 0 {
-			logger.Info("no startup commands specified, skipping.")
+			logger.Infof("no %s commands specified, skipping.", mode)
 			return nil
 		}
 		for _, cmd := range cmds {
 			osCmd := exec.Command(cmd.Path, cmd.Args...)
-			logger.Infof("attempting to execute startup cmd: %+v", osCmd)
-			output, err := osCmd.CombinedOutput()
-			if err != nil {
-				logger.Errorf("unable to execute cmd, err: %v", err)
-				return err
-			}
-			logger.Infof("successfully ran cmd, output: [%v]", string(output))
-		}
-		return nil
-	}
-}
-
-func hostReleaseFnMaker(cmds []execCommand, logger xlog.Logger) agent.ReleaseHostResourcesFn {
-	return func() error {
-		if len(cmds) == 0 {
-			logger.Info("no release commands specified, skipping.")
-			return nil
-		}
-		for _, cmd := range cmds {
-			osCmd := exec.Command(cmd.Path, cmd.Args...)
-			logger.Infof("attempting to execute release cmd: %+v", osCmd)
+			logger.Infof("attempting to execute %s cmd: %+v", mode, osCmd)
 			output, err := osCmd.CombinedOutput()
 			if err != nil {
 				logger.Errorf("unable to execute cmd, err: %v", err)

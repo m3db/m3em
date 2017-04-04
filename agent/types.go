@@ -57,30 +57,25 @@ type Options interface {
 	ExecGenFn() ExecGenFn
 
 	// SetInitHostResourcesFn sets the InitHostResourcesFn
-	SetInitHostResourcesFn(InitHostResourcesFn) Options
+	SetInitHostResourcesFn(HostResourcesFn) Options
 
 	// InitHostResourcesFn returns the InitHostResourcesFn
-	InitHostResourcesFn() InitHostResourcesFn
+	InitHostResourcesFn() HostResourcesFn
 
 	// SetReleaseHostResourcesFn sets the ReleaseHostResourcesFn
-	SetReleaseHostResourcesFn(ReleaseHostResourcesFn) Options
+	SetReleaseHostResourcesFn(HostResourcesFn) Options
 
 	// ReleaseHostResourcesFn returns the ReleaseHostResourcesFn
-	ReleaseHostResourcesFn() ReleaseHostResourcesFn
+	ReleaseHostResourcesFn() HostResourcesFn
 
 	// TODO(prateek): process monitor opts, metric for process uptime
 }
 
-// InitHostResourcesFn is used by the Agent to capture any resources
+// HostResourcesFn is used by the Agent to capture/release any resources
 // required on the host. E.g. we use hosts that are typically running
 // m3db for staging, for our integration tests as well. So we use this
 // function hook to stop any running instances of m3dbnode on the host.
-type InitHostResourcesFn func() error
-
-// ReleaseHostResourcesFn is used by the Agent to release any resources
-// on host which were acquired using InitHostResourcesFn. This can be thought
-// of as inverse to InitHostResourcesFn.
-type ReleaseHostResourcesFn func() error
+type HostResourcesFn func() error
 
 // ExecGenFn specifies the command to execute for a given build, and config
 // e.g. say the process binary expects the config with a cli flag "-f",
