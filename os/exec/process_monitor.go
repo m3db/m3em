@@ -63,7 +63,7 @@ func (m EnvMap) toSlice() []string {
 	if m == nil || len(m) == 0 {
 		return nil
 	}
-	envVars := make([]string, 0, len(m))
+	envVars := os.Environ()
 	for k, v := range m {
 		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
 	}

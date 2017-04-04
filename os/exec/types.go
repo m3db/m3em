@@ -20,7 +20,9 @@
 
 package exec
 
-// EnvMap is a map of Key-Value pairs representing the environment variables
+// EnvMap is a map of Key-Value pairs representing the environment variables.
+// NB(prateek): these are a set of 'delta' vars, i.e. they are appended to the
+// vars already present in `os.Environ()`.
 type EnvMap map[string]string
 
 // Cmd represents an executable command
