@@ -23,7 +23,6 @@ package environment
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/operator"
@@ -32,7 +31,6 @@ import (
 	"github.com/m3db/m3cluster/shard"
 	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	m3dbchannel "github.com/m3db/m3db/network/server/tchannelthrift/node/channel"
-	xretry "github.com/m3db/m3x/retry"
 	tchannel "github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 )
@@ -314,13 +312,8 @@ func (i *m3dbInst) Health() (M3DBInstanceHealth, error) {
 		return nil
 	}
 
-	// TODO(prateek): move xretry.Options into environment.Options
-	retrier := xretry.NewRetrier(xretry.NewOptions().
-		SetBackoffFactor(2).
-		SetMaxRetries(3).
-		SetInitialBackoff(time.Second).
-		SetJitter(true))
 
+	retrier := i.opts.InstanceOperationRetrier()
 	err = retrier.Attempt(attemptFn)
 	return healthResult, err
 }

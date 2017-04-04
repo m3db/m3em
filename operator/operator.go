@@ -75,42 +75,47 @@ func (o *operator) Setup(
 	if err := o.sendConfig(conf, force); err != nil {
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}
-
 	return nil
 }
 
 func (o *operator) sendSetup(token string, force bool) error {
-	ctx := context.Background()
-	_, err := o.client.Setup(ctx, &m3em.SetupRequest{
-		Token: token,
-		Force: force,
+	return o.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := o.client.Setup(ctx, &m3em.SetupRequest{
+			Token: token,
+			Force: force,
+		})
+		return err
 	})
-	return err
 }
 
 func (o *operator) sendBuild(
 	bld build.ServiceBuild,
 	overwrite bool,
 ) error {
-	filename := bld.SourcePath()
-	iter, err := fs.NewSizedFileReaderIter(filename, o.opts.TransferBufferSize())
-	if err != nil {
-		return err
-	}
-	defer iter.Close()
-	return o.sendFile(iter, m3em.FileType_M3DB_BINARY, bld.ID(), overwrite)
+	return o.opts.Retrier().Attempt(func() error {
+		filename := bld.SourcePath()
+		iter, err := fs.NewSizedFileReaderIter(filename, o.opts.TransferBufferSize())
+		if err != nil {
+			return err
+		}
+		defer iter.Close()
+		return o.sendFile(iter, m3em.FileType_M3DB_BINARY, bld.ID(), overwrite)
+	})
 }
 
 func (o *operator) sendConfig(
 	conf build.ServiceConfiguration,
 	overwrite bool,
 ) error {
-	bytes, err := conf.MarshalText()
-	if err != nil {
-		return err
-	}
-	iter := fs.NewBytesReaderIter(bytes)
-	return o.sendFile(iter, m3em.FileType_M3DB_CONFIG, conf.ID(), overwrite)
+	return o.opts.Retrier().Attempt(func() error {
+		bytes, err := conf.MarshalText()
+		if err != nil {
+			return err
+		}
+		iter := fs.NewBytesReaderIter(bytes)
+		return o.sendFile(iter, m3em.FileType_M3DB_CONFIG, conf.ID(), overwrite)
+	})
 }
 
 func (o *operator) sendFile(
@@ -162,21 +167,27 @@ func (o *operator) sendFile(
 }
 
 func (o *operator) Start() error {
-	ctx := context.Background()
-	_, err := o.client.Start(ctx, &m3em.StartRequest{})
-	return err
+	return o.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := o.client.Start(ctx, &m3em.StartRequest{})
+		return err
+	})
 }
 
 func (o *operator) Stop() error {
-	ctx := context.Background()
-	_, err := o.client.Stop(ctx, &m3em.StopRequest{})
-	return err
+	return o.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := o.client.Stop(ctx, &m3em.StopRequest{})
+		return err
+	})
 }
 
 func (o *operator) Teardown() error {
-	ctx := context.Background()
-	_, err := o.client.Teardown(ctx, &m3em.TeardownRequest{})
-	return err
+	return o.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := o.client.Teardown(ctx, &m3em.TeardownRequest{})
+		return err
+	})
 }
 
 func (o *operator) Reset() error {

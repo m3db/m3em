@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/m3db/m3x/instrument"
+	xretry "github.com/m3db/m3x/retry"
 )
 
 var (
@@ -35,6 +36,7 @@ type options struct {
 	iopts              instrument.Options
 	timeout            time.Duration
 	transferBufferSize int
+	retrier            xretry.Retrier
 }
 
 // NewOptions creates default new options.
@@ -45,6 +47,7 @@ func NewOptions(
 		iopts:              opts,
 		timeout:            defaultTimeout,
 		transferBufferSize: defaultTransferBufferSize,
+		retrier:            xretry.NewRetrier(xretry.NewOptions()),
 	}
 }
 
@@ -55,6 +58,15 @@ func (o *options) SetInstrumentOptions(io instrument.Options) Options {
 
 func (o *options) InstrumentOptions() instrument.Options {
 	return o.iopts
+}
+
+func (o *options) SetRetrier(retrier xretry.Retrier) Options {
+	o.retrier = retrier
+	return o
+}
+
+func (o *options) Retrier() xretry.Retrier {
+	return o.retrier
 }
 
 func (o *options) SetTimeout(d time.Duration) Options {

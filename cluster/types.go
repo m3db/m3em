@@ -201,4 +201,12 @@ type Options interface {
 	// PlacementService returns the PlacementService to use for cluster
 	// configuration
 	PlacementService() services.PlacementService
+
+	// SetInstanceConcurrency sets the number of instances to operate upon
+	// concurrently
+	SetInstanceConcurrency(int) Options
+
+	// InstanceConcurrency returns the number of instances to operate upon
+	// concurrently
+	InstanceConcurrency() int
 }

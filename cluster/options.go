@@ -30,6 +30,7 @@ import (
 
 var (
 	defaultReplication = 3
+	defaultConcurrency = 10
 	defaultNumShards   = 1024
 )
 
@@ -42,6 +43,7 @@ type m3dbClusterOpts struct {
 	maxInstances int
 	replication  int
 	numShards    int
+	concurrency  int
 }
 
 // NewOptions returns a new Options object
@@ -58,6 +60,7 @@ func NewOptions(
 		placementSvc: placementSvc,
 		replication:  defaultReplication,
 		numShards:    defaultNumShards,
+		concurrency:  defaultConcurrency,
 	}
 }
 
@@ -131,4 +134,13 @@ func (o m3dbClusterOpts) SetPlacementService(psvc services.PlacementService) Opt
 
 func (o m3dbClusterOpts) PlacementService() services.PlacementService {
 	return o.placementSvc
+}
+
+func (o m3dbClusterOpts) SetInstanceConcurrency(c int) Options {
+	o.concurrency = c
+	return o
+}
+
+func (o m3dbClusterOpts) InstanceConcurrency() int {
+	return o.concurrency
 }

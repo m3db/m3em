@@ -28,6 +28,7 @@ import (
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3x/instrument"
+	xretry "github.com/m3db/m3x/retry"
 )
 
 // InstanceStatus indicates the different states a ServiceInstance can be in. The
@@ -159,14 +160,6 @@ type Options interface {
 	// InstrumentOptions returns the instrumentation options
 	InstrumentOptions() instrument.Options
 
-	// SetInstanceOperationsConcurrency sets the number of instances
-	// to operate upon concurrently
-	SetInstanceOperationsConcurrency(int) Options
-
-	// InstanceOperationsConcurrency returns the number of instances
-	// to operate upon concurrently
-	InstanceOperationsConcurrency() int
-
 	// SetInstanceOperationTimeout returns the timeout for an
 	// instance operation
 	SetInstanceOperationTimeout(time.Duration) Options
@@ -175,13 +168,11 @@ type Options interface {
 	// instance operation
 	InstanceOperationTimeout() time.Duration
 
-	// SetInstanceOperationRetries sets the number of retries attempted
-	// for an instance operation
-	SetInstanceOperationRetries(int) Options
+	// SetInstanceOperationRetrier sets the retrier for Instance operations.
+	SetInstanceOperationRetrier(xretry.Retrier) Options
 
-	// InstanceOperationRetries returns the number of retries attempted
-	// for an instance operation
-	InstanceOperationRetries() int
+	// InstanceOperationRetrier returns the retrier for Instance operations.
+	InstanceOperationRetrier() xretry.Retrier
 
 	// SetToken sets the token used for interactions with remote
 	// m3em agents.

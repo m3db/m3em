@@ -26,6 +26,7 @@ import (
 	"github.com/m3db/m3em/build"
 
 	"github.com/m3db/m3x/instrument"
+	xretry "github.com/m3db/m3x/retry"
 )
 
 // Operator provides control over the resources (fs/process/etc) available to a ServiceInstance.
@@ -67,6 +68,12 @@ type Options interface {
 
 	// InstrumentOptions returns the instrumentation options
 	InstrumentOptions() instrument.Options
+
+	// SetRetrier sets the retrier
+	SetRetrier(xretry.Retrier) Options
+
+	// Retrier returns the retrier
+	Retrier() xretry.Retrier
 
 	// SetTimeout sets the timeout for operations
 	SetTimeout(time.Duration) Options

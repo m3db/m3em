@@ -25,29 +25,23 @@ import (
 
 	"github.com/m3db/m3em/operator"
 
-	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3x/instrument"
+	xretry "github.com/m3db/m3x/retry"
 )
 
 const (
-	defaultToken                 = ""
-	defaultInstanceOverride      = false
-	defaultInstanceOpsConcurreny = 3
-	defaultInstanceOpRetries     = 3
-	defaultInstanceOptTimeout    = 90 * time.Second
+	defaultToken              = ""
+	defaultInstanceOverride   = false
+	defaultInstanceOptTimeout = 90 * time.Second
 )
 
 type opts struct {
-	iopts                  instrument.Options
-	operatorOpts           operator.Options
-	instancePool           string
-	serviceID              services.ServiceID
-	newInstanceFn          NewInstanceFn
-	instanceOpsConcurrency int
-	instanceOpRetries      int
-	instanceOpTimeout      time.Duration
-	instanceOverride       bool
-	token                  string
+	iopts             instrument.Options
+	operatorOpts      operator.Options
+	instanceOpRetrier xretry.Retrier
+	instanceOpTimeout time.Duration
+	instanceOverride  bool
+	token             string
 }
 
 // NewOptions returns a new Options object
@@ -56,12 +50,11 @@ func NewOptions(iopts instrument.Options) Options {
 		iopts = instrument.NewOptions()
 	}
 	return &opts{
-		iopts:                  iopts,
-		instanceOpRetries:      defaultInstanceOpRetries,
-		instanceOpsConcurrency: defaultInstanceOpsConcurreny,
-		instanceOpTimeout:      defaultInstanceOptTimeout,
-		instanceOverride:       defaultInstanceOverride,
-		token:                  defaultToken,
+		iopts:             iopts,
+		instanceOpRetrier: xretry.NewRetrier(xretry.NewOptions()),
+		instanceOpTimeout: defaultInstanceOptTimeout,
+		instanceOverride:  defaultInstanceOverride,
+		token:             defaultToken,
 	}
 }
 
@@ -74,41 +67,6 @@ func (o opts) InstrumentOptions() instrument.Options {
 	return o.iopts
 }
 
-func (o opts) SetServiceID(sid services.ServiceID) Options {
-	o.serviceID = sid
-	return o
-}
-
-func (o opts) ServiceID() services.ServiceID {
-	return o.serviceID
-}
-
-func (o opts) SetInstancePool(ip string) Options {
-	o.instancePool = ip
-	return o
-}
-
-func (o opts) InstancePool() string {
-	return o.instancePool
-}
-
-func (o opts) SetNewInstanceFn(hfn NewInstanceFn) Options {
-	o.newInstanceFn = hfn
-	return o
-}
-
-func (o opts) NewInstanceFn() NewInstanceFn {
-	return o.newInstanceFn
-}
-func (o opts) SetInstanceOperationsConcurrency(c int) Options {
-	o.instanceOpsConcurrency = c
-	return o
-}
-
-func (o opts) InstanceOperationsConcurrency() int {
-	return o.instanceOpsConcurrency
-}
-
 func (o opts) SetInstanceOperationTimeout(td time.Duration) Options {
 	o.instanceOpTimeout = td
 	return o
@@ -118,13 +76,13 @@ func (o opts) InstanceOperationTimeout() time.Duration {
 	return o.instanceOpTimeout
 }
 
-func (o opts) SetInstanceOperationRetries(r int) Options {
-	o.instanceOpRetries = r
+func (o opts) SetInstanceOperationRetrier(retrier xretry.Retrier) Options {
+	o.instanceOpRetrier = retrier
 	return o
 }
 
-func (o opts) InstanceOperationRetries() int {
-	return o.instanceOpRetries
+func (o opts) InstanceOperationRetrier() xretry.Retrier {
+	return o.instanceOpRetrier
 }
 
 func (o opts) SetOperatorOptions(oo operator.Options) Options {
