@@ -190,12 +190,19 @@ func (pm *processMonitor) startSync() {
 	pm.running = true
 	pm.Unlock()
 
-	err := pm.cmd.Run()
+	if err := pm.cmd.Run(); err != nil {
+		pm.Lock()
+		pm.err = err
+		pm.running = false
+		pm.Unlock()
+		pm.notifyListener(err)
+		return
+	}
+
 	pm.Lock()
-	pm.err = err
 	pm.running = false
 	pm.Unlock()
-	pm.notifyListener(err)
+	pm.notifyListener(nil)
 }
 
 func (pm *processMonitor) Stop() error {

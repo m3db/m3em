@@ -31,6 +31,7 @@ import (
 	services "github.com/m3db/m3cluster/services"
 	shard "github.com/m3db/m3cluster/shard"
 	instrument "github.com/m3db/m3x/instrument"
+	retry "github.com/m3db/m3x/retry"
 	time "time"
 )
 
@@ -348,14 +349,14 @@ func (_m *MockOptions) EXPECT() *_MockOptionsRecorder {
 	return _m.recorder
 }
 
-func (_m *MockOptions) InstanceOperationRetries() int {
-	ret := _m.ctrl.Call(_m, "InstanceOperationRetries")
-	ret0, _ := ret[0].(int)
+func (_m *MockOptions) InstanceOperationRetrier() retry.Retrier {
+	ret := _m.ctrl.Call(_m, "InstanceOperationRetrier")
+	ret0, _ := ret[0].(retry.Retrier)
 	return ret0
 }
 
-func (_mr *_MockOptionsRecorder) InstanceOperationRetries() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationRetries")
+func (_mr *_MockOptionsRecorder) InstanceOperationRetrier() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationRetrier")
 }
 
 func (_m *MockOptions) InstanceOperationTimeout() time.Duration {
@@ -366,16 +367,6 @@ func (_m *MockOptions) InstanceOperationTimeout() time.Duration {
 
 func (_mr *_MockOptionsRecorder) InstanceOperationTimeout() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationTimeout")
-}
-
-func (_m *MockOptions) InstanceOperationsConcurrency() int {
-	ret := _m.ctrl.Call(_m, "InstanceOperationsConcurrency")
-	ret0, _ := ret[0].(int)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) InstanceOperationsConcurrency() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationsConcurrency")
 }
 
 func (_m *MockOptions) InstanceOverride() bool {
@@ -408,14 +399,14 @@ func (_mr *_MockOptionsRecorder) OperatorOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "OperatorOptions")
 }
 
-func (_m *MockOptions) SetInstanceOperationRetries(_param0 int) Options {
-	ret := _m.ctrl.Call(_m, "SetInstanceOperationRetries", _param0)
+func (_m *MockOptions) SetInstanceOperationRetrier(_param0 retry.Retrier) Options {
+	ret := _m.ctrl.Call(_m, "SetInstanceOperationRetrier", _param0)
 	ret0, _ := ret[0].(Options)
 	return ret0
 }
 
-func (_mr *_MockOptionsRecorder) SetInstanceOperationRetries(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationRetries", arg0)
+func (_mr *_MockOptionsRecorder) SetInstanceOperationRetrier(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationRetrier", arg0)
 }
 
 func (_m *MockOptions) SetInstanceOperationTimeout(_param0 time.Duration) Options {
@@ -426,16 +417,6 @@ func (_m *MockOptions) SetInstanceOperationTimeout(_param0 time.Duration) Option
 
 func (_mr *_MockOptionsRecorder) SetInstanceOperationTimeout(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationTimeout", arg0)
-}
-
-func (_m *MockOptions) SetInstanceOperationsConcurrency(_param0 int) Options {
-	ret := _m.ctrl.Call(_m, "SetInstanceOperationsConcurrency", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetInstanceOperationsConcurrency(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationsConcurrency", arg0)
 }
 
 func (_m *MockOptions) SetInstanceOverride(_param0 bool) Options {

@@ -376,3 +376,23 @@ func (_m *MockOptions) PlacementService() services.PlacementService {
 func (_mr *_MockOptionsRecorder) PlacementService() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "PlacementService")
 }
+
+func (_m *MockOptions) SetInstanceConcurrency(_param0 int) Options {
+	ret := _m.ctrl.Call(_m, "SetInstanceConcurrency", _param0)
+	ret0, _ := ret[0].(Options)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SetInstanceConcurrency(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceConcurrency", arg0)
+}
+
+func (_m *MockOptions) InstanceConcurrency() int {
+	ret := _m.ctrl.Call(_m, "InstanceConcurrency")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) InstanceConcurrency() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceConcurrency")
+}

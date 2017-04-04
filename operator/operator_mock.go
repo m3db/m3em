@@ -27,6 +27,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	build "github.com/m3db/m3em/build"
 	instrument "github.com/m3db/m3x/instrument"
+	retry "github.com/m3db/m3x/retry"
 	time "time"
 )
 
@@ -140,6 +141,26 @@ func (_m *MockOptions) InstrumentOptions() instrument.Options {
 
 func (_mr *_MockOptionsRecorder) InstrumentOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstrumentOptions")
+}
+
+func (_m *MockOptions) SetRetrier(_param0 retry.Retrier) Options {
+	ret := _m.ctrl.Call(_m, "SetRetrier", _param0)
+	ret0, _ := ret[0].(Options)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SetRetrier(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetRetrier", arg0)
+}
+
+func (_m *MockOptions) Retrier() retry.Retrier {
+	ret := _m.ctrl.Call(_m, "Retrier")
+	ret0, _ := ret[0].(retry.Retrier)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) Retrier() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Retrier")
 }
 
 func (_m *MockOptions) SetTimeout(_param0 time.Duration) Options {

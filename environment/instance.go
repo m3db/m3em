@@ -62,13 +62,18 @@ type m3dbInst struct {
 
 // NewM3DBInstance returns a new M3DBInstance.
 func NewM3DBInstance(
-	id string,
+	inst services.PlacementInstance,
 	op operator.Operator,
 	opts Options,
 ) M3DBInstance {
 	return &m3dbInst{
 		opts:     opts,
-		id:       id,
+		id:       inst.ID(),
+		rack:     inst.Rack(),
+		zone:     inst.Zone(),
+		weight:   inst.Weight(),
+		endpoint: inst.Endpoint(),
+		shards:   inst.Shards(),
 		status:   InstanceStatusUninitialized,
 		operator: op,
 	}
@@ -266,28 +271,19 @@ func (i *m3dbInst) Operator() operator.Operator {
 	return i.operator
 }
 
-func newThriftClient(tchannelEndpoint string) (m3dbrpc.TChanNode, error) {
-	channel, err := tchannel.NewChannel("Client", nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not create new tchannel channel: %v", err)
-	}
-	endpoint := &thrift.ClientOptions{HostPort: tchannelEndpoint}
-	thriftClient := thrift.NewClient(channel, m3dbchannel.ChannelName, endpoint)
-	client := m3dbrpc.NewTChanNodeClient(thriftClient)
-	return client, nil
-}
-
 func (i *m3dbInst) thriftClient() (m3dbrpc.TChanNode, error) {
 	i.Lock()
 	defer i.Unlock()
 	if i.m3dbClient != nil {
 		return i.m3dbClient, nil
 	}
-
-	client, err := newThriftClient(i.endpoint)
+	channel, err := tchannel.NewChannel("Client", nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create new tchannel channel: %v", err)
 	}
+	endpoint := &thrift.ClientOptions{HostPort: i.endpoint}
+	thriftClient := thrift.NewClient(channel, m3dbchannel.ChannelName, endpoint)
+	client := m3dbrpc.NewTChanNodeClient(thriftClient)
 	i.m3dbClient = client
 	return i.m3dbClient, nil
 }
@@ -311,7 +307,6 @@ func (i *m3dbInst) Health() (M3DBInstanceHealth, error) {
 		healthResult.Status = result.GetStatus()
 		return nil
 	}
-
 
 	retrier := i.opts.InstanceOperationRetrier()
 	err = retrier.Attempt(attemptFn)
