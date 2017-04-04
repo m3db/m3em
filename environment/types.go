@@ -179,6 +179,6 @@ type Options interface {
 	SetInstanceOverride(bool) Options
 
 	// InstanceOverride returns a flag indicating if m3em agent operations
-	// are permitted to override clashing resources.
+	// are permitted to override clashing resources
 	InstanceOverride() bool
 }
