@@ -21,6 +21,8 @@
 package agent
 
 import (
+	"github.com/m3db/m3em/os/exec"
+
 	"github.com/m3db/m3x/instrument"
 )
 
@@ -40,6 +42,7 @@ type opts struct {
 	execGenFn  ExecGenFn
 	initFn     HostResourcesFn
 	releaseFn  HostResourcesFn
+	envMap     exec.EnvMap
 }
 
 // NewOptions constructs new options
@@ -95,4 +98,13 @@ func (o *opts) SetReleaseHostResourcesFn(fn HostResourcesFn) Options {
 
 func (o *opts) ReleaseHostResourcesFn() HostResourcesFn {
 	return o.releaseFn
+}
+
+func (o *opts) SetEnvMap(em exec.EnvMap) Options {
+	o.envMap = em
+	return o
+}
+
+func (o *opts) EnvMap() exec.EnvMap {
+	return o.envMap
 }

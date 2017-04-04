@@ -224,6 +224,7 @@ func (o *opAgent) startWithLock() error {
 			Path:      path,
 			Args:      osArgs,
 			OutputDir: o.opts.WorkingDirectory(),
+			Env:       o.opts.EnvMap(),
 		}
 		listener = o.newProcessListener()
 		pm, err  = exec.NewProcessMonitor(cmd, listener)

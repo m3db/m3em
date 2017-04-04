@@ -35,9 +35,10 @@ type Configuration struct {
 
 // AgentConfiguration is a collection of knobs to configure agents
 type AgentConfiguration struct {
-	WorkingDir  string        `yaml:"workingDir" validate:"nonzero"`
-	StartupCmds []ExecCommand `yaml:"startupCmds"`
-	ReleaseCmds []ExecCommand `yaml:"releaseCmds"`
+	WorkingDir  string            `yaml:"workingDir" validate:"nonzero"`
+	StartupCmds []ExecCommand     `yaml:"startupCmds"`
+	ReleaseCmds []ExecCommand     `yaml:"releaseCmds"`
+	TestEnvVars map[string]string `yaml:"testEnvVars"`
 }
 
 // ExecCommand is an executable command

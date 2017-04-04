@@ -23,11 +23,12 @@ package agentmain
 import (
 	"net/http"
 	"os"
-	"os/exec"
+	oexec "os/exec"
 	"time"
 
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/generated/proto/m3em"
+	"github.com/m3db/m3em/os/exec"
 	m3emconfig "github.com/m3db/m3em/services/m3em_agent/config"
 	"github.com/m3db/m3em/services/m3em_agent/tcp"
 
@@ -83,7 +84,8 @@ func Run() {
 		SetWorkingDirectory(conf.Agent.WorkingDir).
 		SetInitHostResourcesFn(hostFnMaker("startup", conf.Agent.StartupCmds, logger)).
 		SetReleaseHostResourcesFn(hostFnMaker("release", conf.Agent.ReleaseCmds, logger)).
-		SetExecGenFn(execGenFn)
+		SetExecGenFn(execGenFn).
+		SetEnvMap(exec.EnvMap(conf.Agent.TestEnvVars))
 
 	agentService, err := agent.New(agentOpts)
 	if err != nil {
@@ -104,7 +106,7 @@ func hostFnMaker(mode string, cmds []m3emconfig.ExecCommand, logger xlog.Logger)
 			return nil
 		}
 		for _, cmd := range cmds {
-			osCmd := exec.Command(cmd.Path, cmd.Args...)
+			osCmd := oexec.Command(cmd.Path, cmd.Args...)
 			logger.Infof("attempting to execute %s cmd: %+v", mode, osCmd)
 			output, err := osCmd.CombinedOutput()
 			if err != nil {
