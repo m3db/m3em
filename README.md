@@ -15,3 +15,35 @@ The goal of `m3em` is to make it easy to create, manage and destroy small M3DB c
 [ci]: https://travis-ci.org/m3db/m3em
 [cov-img]: https://coveralls.io/repos/m3db/m3em/badge.svg?branch=master&service=github
 [cov]: https://coveralls.io/github/m3db/m3em?branch=master
+
+
+## m3em_agent
+
+```
+$ cat >m3em.agent.yaml <<EOF
+server:
+  listenAddress: "0.0.0.0:14541"
+  debugAddress: "0.0.0.0:24541"
+
+metrics:
+  sampleRate: 0.02
+  m3:
+    HostPort: "127.0.0.1:9052"
+    Service: "m3em"
+    IncludeHost: true
+    Env: "development"
+
+agent:
+  workingDir: /tmp/m3em-agent
+  startupCmds:
+    - path: /usr/bin/supervisorctl
+      args:
+        - stop
+        - statsdex_m3dbnode
+  releaseCmds:
+    - path: /usr/bin/supervisorctl
+      args:
+        - start
+        - statsdex_m3dbnode
+EOF
+```
