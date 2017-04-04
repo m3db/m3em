@@ -90,6 +90,51 @@ func TestSimpleExec(t *testing.T) {
 	require.Equal(t, []byte{}, stderrContents)
 }
 
+func TestEnvSet(t *testing.T) {
+	tempDir := newTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	scriptNum := 0
+	scriptContents := []byte(`#!/usr/bin/env bash
+if [ "$NEW_ENV_VAR" != "expected_arg" ]; then
+	echo "Invalid value for NEW_ENV_VAR: $NEW_ENV_VAR" >&2
+	exit 1
+fi
+echo -ne "testing random output"`)
+	testScript := newTestScript(t, tempDir, scriptNum, scriptContents)
+	basePath := filepath.Base(testScript)
+	cmd := Cmd{
+		Path:      testScript,
+		Args:      []string{testScript},
+		OutputDir: tempDir,
+		Env:       map[string]string{"NEW_ENV_VAR": "expected_arg"},
+	}
+
+	success := false
+	tl := NewProcessListener(
+		func() { success = true },
+		func(err error) { require.FailNow(t, "unexpected error", err.Error()) },
+	)
+	pm, err := NewProcessMonitor(cmd, tl)
+	require.NoError(t, err)
+	pmStruct, ok := pm.(*processMonitor)
+	require.True(t, ok)
+	pmStruct.startFn = pmStruct.startSync
+	require.NoError(t, pm.Start())
+	require.NoError(t, pm.Err())
+	require.True(t, success)
+
+	expectedStderrFile := path.Join(tempDir, fmt.Sprintf("%s.%s", basePath, defaultStderrSuffix))
+	stderrContents, err := ioutil.ReadFile(expectedStderrFile)
+	require.NoError(t, err)
+	require.Equal(t, []byte{}, stderrContents, string(stderrContents))
+
+	expectedStdoutFile := path.Join(tempDir, fmt.Sprintf("%s.%s", basePath, defaultStdoutSuffix))
+	stdoutContents, err := ioutil.ReadFile(expectedStdoutFile)
+	require.NoError(t, err)
+	require.Equal(t, []byte("testing random output"), stdoutContents)
+}
+
 func TestArgPassing(t *testing.T) {
 	tempDir := newTempDir(t)
 	defer os.RemoveAll(tempDir)

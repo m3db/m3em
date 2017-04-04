@@ -20,6 +20,9 @@
 
 package exec
 
+// EnvMap is a map of Key-Value pairs representing the environment variables
+type EnvMap map[string]string
+
 // Cmd represents an executable command
 // NB(prateek): golang's os/exec package makes an implicit requirement that
 // Args[0] to be set to Path, iff Args is set at all. This package follows the
@@ -29,6 +32,7 @@ type Cmd struct {
 	Path      string
 	Args      []string
 	OutputDir string
+	Env       EnvMap
 }
 
 // ProcessListener permits users of the API to be notified of process termination

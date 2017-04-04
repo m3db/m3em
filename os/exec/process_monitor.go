@@ -59,6 +59,17 @@ func (c Cmd) validate() error {
 	return nil
 }
 
+func (m EnvMap) toSlice() []string {
+	if m == nil || len(m) == 0 {
+		return nil
+	}
+	envVars := make([]string, 0, len(m))
+	for k, v := range m {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+	return envVars
+}
+
 type processListener struct {
 	complete func()
 	err      func(error)
@@ -135,6 +146,7 @@ func NewProcessMonitor(cmd Cmd, pl ProcessListener) (ProcessMonitor, error) {
 	ocmd.Dir = cmd.OutputDir
 	ocmd.Stderr = stderrWriter
 	ocmd.Stdout = stdoutWriter
+	ocmd.Env = cmd.Env.toSlice()
 
 	pm := &processMonitor{
 		listener:   pl,
