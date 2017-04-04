@@ -90,7 +90,8 @@ func readConfiguration(filename string) (configurationFile, error) {
 	return conf, nil
 }
 
-func main() {
+// Run runs a m3em_agent process
+func Run() {
 	var (
 		configFile = getopt.StringLong("config-file", 'f', "", "Configuration file")
 	)
@@ -189,4 +190,8 @@ func hostReleaseFnMaker(cmds []execCommand, logger xlog.Logger) agent.ReleaseHos
 
 func execGenFn(binary string, config string) (string, []string) {
 	return binary, []string{"-f", config}
+}
+
+func main() {
+	Run()
 }
