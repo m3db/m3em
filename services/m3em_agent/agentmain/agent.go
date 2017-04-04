@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	oexec "os/exec"
+	"strings"
 	"time"
 
 	"github.com/m3db/m3em/agent"
@@ -33,7 +34,6 @@ import (
 	"github.com/m3db/m3em/services/m3em_agent/tcp"
 
 	"github.com/m3db/m3x/instrument"
-
 	xlog "github.com/m3db/m3x/log"
 	"github.com/pborman/getopt"
 	"github.com/uber-go/tally"
@@ -85,7 +85,7 @@ func Run() {
 		SetInitHostResourcesFn(hostFnMaker("startup", conf.Agent.StartupCmds, logger)).
 		SetReleaseHostResourcesFn(hostFnMaker("release", conf.Agent.ReleaseCmds, logger)).
 		SetExecGenFn(execGenFn).
-		SetEnvMap(exec.EnvMap(conf.Agent.TestEnvVars))
+		SetEnvMap(envMap(logger, conf.Agent.TestEnvVars))
 
 	agentService, err := agent.New(agentOpts)
 	if err != nil {
@@ -97,6 +97,20 @@ func Run() {
 	if err := server.Serve(listener); err != nil {
 		logger.Fatalf("could not serve: %v", err)
 	}
+}
+
+// HACK(prateek): YAML un-marshalling returns lower-case keys for everything,
+// setting to upper-case explicitly here.
+func envMap(logger xlog.Logger, envMap map[string]string) exec.EnvMap {
+	logger.Warnf("Transformings keys set in YAML for testEnvVars to UPPER_CASE")
+	if envMap == nil {
+		return nil
+	}
+	newMap := make(map[string]string, len(envMap))
+	for key, value := range envMap {
+		newMap[strings.ToUpper(key)] = value
+	}
+	return exec.EnvMap(newMap)
 }
 
 func hostFnMaker(mode string, cmds []m3emconfig.ExecCommand, logger xlog.Logger) agent.HostResourcesFn {
