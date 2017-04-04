@@ -142,10 +142,6 @@ type M3DBEnvironment interface {
 	Status() map[string]InstanceStatus
 }
 
-// NewInstanceFn is a function to retrieve M3DBInstance wrapping the specified
-// placement instance object.
-type NewInstanceFn func(services.PlacementInstance, Options) (M3DBInstance, error)
-
 // Options are the knobs used to tweak Environment interactions
 type Options interface {
 	// SetOperatorOptions sets the operator.Options
@@ -160,33 +156,29 @@ type Options interface {
 	// InstrumentOptions returns the instrumentation options
 	InstrumentOptions() instrument.Options
 
-	// SetInstanceOperationTimeout returns the timeout for an
-	// instance operation
+	// SetInstanceOperationTimeout returns the timeout for instance operations
 	SetInstanceOperationTimeout(time.Duration) Options
 
-	// InstanceOperationTimeout returns the timeout for an
-	// instance operation
+	// InstanceOperationTimeout returns the timeout for instance operations
 	InstanceOperationTimeout() time.Duration
 
-	// SetInstanceOperationRetrier sets the retrier for Instance operations.
+	// SetInstanceOperationRetrier sets the retrier for instance operations
 	SetInstanceOperationRetrier(xretry.Retrier) Options
 
-	// InstanceOperationRetrier returns the retrier for Instance operations.
+	// InstanceOperationRetrier returns the retrier for instance operations
 	InstanceOperationRetrier() xretry.Retrier
 
-	// SetToken sets the token used for interactions with remote
-	// m3em agents.
+	// SetToken sets the token used for interactions with remote m3em agents
 	SetToken(string) Options
 
-	// Token returns the token used for interactions with remote
-	// m3em agents.
+	// Token returns the token used for interactions with remote m3em agents
 	Token() string
 
-	// SetInstanceOverride sets a flag indicating if m3em agent
-	// operations are permitted to override clashing resources.
+	// SetInstanceOverride sets a flag indicating if m3em agent operations
+	// are permitted to override clashing resources
 	SetInstanceOverride(bool) Options
 
-	// InstanceOverride returns a flag indicating if m3em agent
-	// operations are permitted to override clashing resources.
+	// InstanceOverride returns a flag indicating if m3em agent operations
+	// are permitted to override clashing resources.
 	InstanceOverride() bool
 }
