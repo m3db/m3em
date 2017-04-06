@@ -53,15 +53,34 @@ type Operator interface {
 	// Reset gets the remote host to same state as after Setup()
 	Reset() error
 
+	// RegisterListener registers an event listener
+	RegisterListener(Listener) ListenerID
+
+	// DeregisterListener un-registers an event listener
+	DeregisterListener(ListenerID)
+
 	// CleanDataDirectory() error
 	// ListDataDirectory(recursive bool, includeContents bool) ([]DirEntry, error)
 
 	// log directory operations
 }
 
+// ListenerID is a unique identifier for a registered listener
+type ListenerID int
+
+// Listener ...
+type Listener interface {
+	OnProcessTerminate(desc string)
+
+	OnHeartbeatTimeout(lastTs time.Time)
+
+	OnOverwrite(desc string)
+}
+
 // Options returns options pertaining to `Operator` configuration.
 type Options interface {
-	// TODO(prateek): this needs a validate
+	// Validate returns an error iff the options are set to invalid values
+	Validate() error
 
 	// SetInstrumentOptions sets the instrumentation options
 	SetInstrumentOptions(instrument.Options) Options
@@ -75,10 +94,10 @@ type Options interface {
 	// Retrier returns the retrier
 	Retrier() xretry.Retrier
 
-	// SetTimeout sets the timeout for operations
+	// SetTimeout sets the GRPC connection timeout
 	SetTimeout(time.Duration) Options
 
-	// Timeout returns the timeout duration
+	// Timeout returns the GRPC connection timeout
 	Timeout() time.Duration
 
 	// SetTransferBufferSize sets the bytes buffer size used during file transfer
@@ -86,7 +105,53 @@ type Options interface {
 
 	// TransferBufferSize returns the bytes buffer size used during file transfer
 	TransferBufferSize() int
+
+	// SetHeartbeatOptions sets the HeartbeatOptions
+	SetHeartbeatOptions(HeartbeatOptions) Options
+
+	// HeartbeatOptions returns the HeartbeatOptions
+	HeartbeatOptions() HeartbeatOptions
 }
+
+// HeartbeatOptions are the knobs to control heartbeating behavior
+type HeartbeatOptions interface {
+	// SetEnabled sets whether the Heartbeating is enabled
+	SetEnabled(bool) HeartbeatOptions
+
+	// Enabled returns whether the Heartbeating is enabled
+	Enabled() bool
+
+	// SetNowFn sets the NowFn
+	SetNowFn(NowFn) HeartbeatOptions
+
+	// NowFn returns the NowFn
+	NowFn() NowFn
+
+	// SetInterval sets the heartbeating interval
+	SetInterval(time.Duration) HeartbeatOptions
+
+	// Interval returns the heartbeating interval
+	Interval() time.Duration
+
+	// SetCheckInterval sets the frequency with which heartbeating timeouts
+	// are checked
+	SetCheckInterval(time.Duration) HeartbeatOptions
+
+	// CheckInterval returns the frequency with which heartbeating timeouts
+	// are checked
+	CheckInterval() time.Duration
+
+	// SetTimeout sets the heartbeat timeout duration, i.e. the window of
+	// time after which missing heartbeats are considered errorneous
+	SetTimeout(time.Duration) HeartbeatOptions
+
+	// Timeout returns the heartbeat timeout duration, i.e. the window of
+	// time after which missing heartbeats are considered errorneous
+	Timeout() time.Duration
+}
+
+// NowFn returns the current time
+type NowFn func() time.Time
 
 // DirEntry corresponds to a file present in a directory.
 type DirEntry struct {

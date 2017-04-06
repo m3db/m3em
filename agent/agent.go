@@ -50,9 +50,6 @@ var (
 	errProcessMonitorNotDefined = fmt.Errorf("process monitor not defined")
 )
 
-// TODO(prateek): add heartbeating from agent -> operator
-// this is to ensure capture of asynchronous error conditions, e.g.
-// the child process kicked off by the agent dies, but the operator is not informed.
 type opAgent struct {
 	sync.RWMutex
 	opts           Options
@@ -127,8 +124,8 @@ func (o *opAgent) reportMetrics() {
 }
 
 func (o *opAgent) Running() bool {
-	o.Lock()
-	defer o.Unlock()
+	o.RLock()
+	defer o.RUnlock()
 	return o.running
 }
 
@@ -174,6 +171,10 @@ func (o *opAgent) markFileDone(
 	default:
 		o.logger.Warnf("received unknown fileType: %v, filename: %s", fileType, filename)
 	}
+}
+
+func (o *opAgent) Heartbeat(request *m3em.HeartbeatRequest, stream m3em.Operator_HeartbeatServer) error {
+	panic("not implemented")
 }
 
 func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.StartResponse, error) {

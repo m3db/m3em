@@ -21,6 +21,7 @@
 package operator
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/m3db/m3x/instrument"
@@ -30,6 +31,7 @@ import (
 var (
 	defaultTimeout            = 2 * time.Minute
 	defaultTransferBufferSize = 1024 * 1024 /* 1 MB */
+	fourMegaBytes             = 4 * 1024 * 1024
 )
 
 type options struct {
@@ -37,6 +39,7 @@ type options struct {
 	timeout            time.Duration
 	transferBufferSize int
 	retrier            xretry.Retrier
+	hOpts              HeartbeatOptions
 }
 
 // NewOptions creates default new options.
@@ -48,7 +51,17 @@ func NewOptions(
 		timeout:            defaultTimeout,
 		transferBufferSize: defaultTransferBufferSize,
 		retrier:            xretry.NewRetrier(xretry.NewOptions()),
+		hOpts:              NewHeartbeatOptions(),
 	}
+}
+
+func (o *options) Validate() error {
+	// grpc max message size (by default, 4MB). see also: https://github.com/grpc/grpc-go/issues/746
+	if o.transferBufferSize >= fourMegaBytes {
+		return fmt.Errorf("TransferBufferSize must be < 4MB")
+	}
+
+	return nil
 }
 
 func (o *options) SetInstrumentOptions(io instrument.Options) Options {
@@ -78,8 +91,6 @@ func (o *options) Timeout() time.Duration {
 	return o.timeout
 }
 
-// TODO(prateek): ensure this number is less than the grpc max message size (by default, 4MB)
-// see also: https://github.com/grpc/grpc-go/issues/746
 func (o *options) SetTransferBufferSize(sz int) Options {
 	o.transferBufferSize = sz
 	return o
@@ -87,4 +98,13 @@ func (o *options) SetTransferBufferSize(sz int) Options {
 
 func (o *options) TransferBufferSize() int {
 	return o.transferBufferSize
+}
+
+func (o *options) SetHeartbeatOptions(ho HeartbeatOptions) Options {
+	o.hOpts = ho
+	return o
+}
+
+func (o *options) HeartbeatOptions() HeartbeatOptions {
+	return o.hOpts
 }

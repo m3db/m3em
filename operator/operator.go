@@ -23,21 +23,27 @@ package operator
 import (
 	"context"
 	"fmt"
+	"io"
+	"sync"
+	"time"
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/fs"
 
+	"github.com/m3db/m3x/instrument"
 	"github.com/m3db/m3x/log"
 	"google.golang.org/grpc"
 )
 
 type operator struct {
-	endpoint   string
-	clientConn *grpc.ClientConn
-	client     m3em.OperatorClient
-	opts       Options
-	logger     xlog.Logger
+	endpoint    string
+	clientConn  *grpc.ClientConn
+	client      m3em.OperatorClient
+	opts        Options
+	logger      xlog.Logger
+	listeners   *listenerGroup
+	heartbeater *opHeartbeater
 }
 
 // New creates a new operator
@@ -45,16 +51,28 @@ func New(
 	endpoint string,
 	opts Options,
 ) (Operator, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
 	conn, err := grpc.Dial(endpoint, grpc.WithTimeout(opts.Timeout()), grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
+
+	var (
+		client      = m3em.NewOperatorClient(conn)
+		listeners   = newListenerGroup()
+		heartbeater = newHeartbeater(client, opts.InstrumentOptions(), opts.HeartbeatOptions(), listeners)
+	)
+
 	return &operator{
-		endpoint:   endpoint,
-		clientConn: conn,
-		client:     m3em.NewOperatorClient(conn),
-		opts:       opts,
-		logger:     opts.InstrumentOptions().Logger(),
+		endpoint:    endpoint,
+		listeners:   listeners,
+		client:      client,
+		clientConn:  conn,
+		opts:        opts,
+		logger:      opts.InstrumentOptions().Logger(),
+		heartbeater: heartbeater,
 	}, nil
 }
 
@@ -65,7 +83,13 @@ func (o *operator) Setup(
 	force bool,
 ) error {
 	if err := o.sendSetup(token, force); err != nil {
-		return fmt.Errorf("unable to reset: %v", err)
+		return fmt.Errorf("unable to setup: %v", err)
+	}
+
+	if o.opts.HeartbeatOptions().Enabled() {
+		if err := o.startHeartbeat(); err != nil {
+			return fmt.Errorf("unable to heartbeat: %v", err)
+		}
 	}
 
 	if err := o.sendBuild(bld, force); err != nil {
@@ -76,6 +100,10 @@ func (o *operator) Setup(
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}
 	return nil
+}
+
+func (o *operator) startHeartbeat() error {
+	return o.heartbeater.start()
 }
 
 func (o *operator) sendSetup(token string, force bool) error {
@@ -184,6 +212,7 @@ func (o *operator) Stop() error {
 
 func (o *operator) Teardown() error {
 	return o.opts.Retrier().Attempt(func() error {
+		o.heartbeater.stop()
 		ctx := context.Background()
 		_, err := o.client.Teardown(ctx, &m3em.TeardownRequest{})
 		return err
@@ -200,4 +229,233 @@ func (o *operator) close() error {
 		return conn.Close()
 	}
 	return nil
+}
+
+func (o *operator) RegisterListener(l Listener) ListenerID {
+	return ListenerID(o.listeners.add(l))
+}
+
+func (o *operator) DeregisterListener(token ListenerID) {
+	o.listeners.remove(int(token))
+}
+
+type listenerGroup struct {
+	sync.Mutex
+	elems map[int]Listener
+	token int
+}
+
+func newListenerGroup() *listenerGroup {
+	return &listenerGroup{
+		elems: make(map[int]Listener),
+	}
+}
+
+func (lg *listenerGroup) add(l Listener) int {
+	lg.Lock()
+	defer lg.Unlock()
+	lg.token++
+	lg.elems[lg.token] = l
+	return lg.token
+}
+
+func (lg *listenerGroup) remove(t int) {
+	lg.Lock()
+	defer lg.Unlock()
+	delete(lg.elems, t)
+}
+
+func (lg *listenerGroup) notifyTimeout(lastTs time.Time) {
+	lg.Lock()
+	defer lg.Unlock()
+	for _, l := range lg.elems {
+		go l.OnHeartbeatTimeout(lastTs)
+	}
+}
+
+func (lg *listenerGroup) notifyTermination(desc string) {
+	lg.Lock()
+	defer lg.Unlock()
+	for _, l := range lg.elems {
+		go l.OnProcessTerminate(desc)
+	}
+}
+
+func (lg *listenerGroup) notifyOverwrite(desc string) {
+	lg.Lock()
+	defer lg.Unlock()
+	for _, l := range lg.elems {
+		go l.OnOverwrite(desc)
+	}
+}
+
+// Heartbeating from agent -> operator: this is to ensure capture of asynchronous
+// error conditions, e.g. the child process kicked off by the agent dies, but the
+// operator is not informed.
+
+type opHeartbeater struct {
+	sync.RWMutex
+	wg            *sync.WaitGroup
+	opts          HeartbeatOptions
+	iopts         instrument.Options
+	opClient      m3em.OperatorClient
+	listeners     *listenerGroup
+	client        m3em.Operator_HeartbeatClient
+	clientCancel  context.CancelFunc
+	running       bool
+	stopChan      chan bool
+	lastHeartbeat heartbeat
+}
+
+type heartbeat struct {
+	ts             time.Time
+	processRunning bool
+}
+
+func newHeartbeater(
+	client m3em.OperatorClient,
+	iopts instrument.Options,
+	opts HeartbeatOptions,
+	lg *listenerGroup,
+) *opHeartbeater {
+	return &opHeartbeater{
+		opClient:  client,
+		opts:      opts,
+		iopts:     iopts,
+		listeners: lg,
+		stopChan:  make(chan bool, 1),
+	}
+}
+
+func (h *opHeartbeater) start() error {
+	h.Lock()
+	defer h.Unlock()
+	if h.running {
+		return fmt.Errorf("already heartbeating, terminate existing process first")
+	}
+
+	var (
+		ctx, cancel = context.WithCancel(context.Background())
+		request     = &m3em.HeartbeatRequest{
+			FrequencySecs: uint32(h.opts.Interval().Seconds()),
+		}
+	)
+	heartbeatClient, err := h.opClient.Heartbeat(ctx, request)
+	if err != nil {
+		cancel()
+		return err
+	}
+
+	h.running = true
+	h.client = heartbeatClient
+	h.clientCancel = cancel
+	h.wg.Add(2)
+	go h.heartbeatLoop()
+	go h.monitorLoop()
+	return nil
+}
+
+func (h *opHeartbeater) lastHeartbeatTime() time.Time {
+	h.RLock()
+	defer h.RUnlock()
+	return h.lastHeartbeat.ts
+}
+
+func (h *opHeartbeater) monitorLoop() {
+	defer h.wg.Done()
+	var (
+		checkInterval   = h.opts.CheckInterval()
+		timeoutInterval = h.opts.Timeout()
+		nowFn           = h.opts.NowFn()
+		lastCheck       time.Time
+	)
+
+	for {
+		select {
+		case <-h.stopChan:
+			break // breaking out of the for loop
+		default:
+			last := h.lastHeartbeatTime()
+			if last == lastCheck {
+				time.Sleep(checkInterval)
+				continue
+			}
+			lastCheck = last
+			if !lastCheck.IsZero() && nowFn().Sub(lastCheck) > timeoutInterval {
+				h.listeners.notifyTimeout(lastCheck)
+			}
+			time.Sleep(checkInterval)
+		}
+	}
+}
+
+func (h *opHeartbeater) heartbeatLoop() {
+	defer h.wg.Done()
+	for {
+		msg, err := h.client.Recv()
+		if err == io.EOF || err != nil {
+			h.iopts.Logger().Warnf("unexpected error while streaming heartbeat msgs: %v", err)
+			break // TODO(prateek): this should trigger a new function in Listener
+		}
+		h.processHeartbeatMsg(msg)
+	}
+}
+
+func (h *opHeartbeater) updateLastHeartbeat(hb heartbeat) {
+	h.Lock()
+	h.lastHeartbeat = hb
+	h.Unlock()
+}
+
+func (h *opHeartbeater) processHeartbeatMsg(msg *m3em.HeartbeatResponse) {
+	nowFn := h.opts.NowFn()
+
+	switch msg.GetCode() {
+	case m3em.HeartbeatCode_HEARTBEAT_CODE_HEALTHY:
+		newHeartbeat := heartbeat{
+			ts:             nowFn(),
+			processRunning: msg.GetProcessRunning(),
+		}
+		h.updateLastHeartbeat(newHeartbeat)
+
+	case m3em.HeartbeatCode_HEARTBEAT_CODE_PROCESS_TERMINATION:
+		newHeartbeat := heartbeat{
+			ts:             nowFn(),
+			processRunning: false,
+		}
+		h.updateLastHeartbeat(newHeartbeat)
+		h.listeners.notifyTermination(msg.GetError())
+
+	case m3em.HeartbeatCode_HEARTBEAT_CODE_OVERWRITTEN:
+		h.listeners.notifyOverwrite(msg.GetError())
+		h.stop()
+
+	default:
+		panic(fmt.Errorf("received unknown heartbeat msg: %+v", msg))
+	}
+}
+
+// TODO(prateek): should this also notify?
+func (h *opHeartbeater) stop() {
+	h.Lock()
+	if !h.running {
+		h.resetWithLock()
+		h.Unlock()
+		return
+	}
+
+	h.clientCancel()
+	h.stopChan <- true
+	h.Unlock()
+	h.wg.Wait()
+
+	h.Lock()
+	h.resetWithLock()
+	h.Unlock()
+}
+
+func (h *opHeartbeater) resetWithLock() {
+	h.running = false
+	h.client = nil
+	h.clientCancel = nil
 }

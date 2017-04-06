@@ -102,6 +102,69 @@ func (_mr *_MockOperatorRecorder) Reset() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Reset")
 }
 
+func (_m *MockOperator) RegisterListener(_param0 Listener) ListenerID {
+	ret := _m.ctrl.Call(_m, "RegisterListener", _param0)
+	ret0, _ := ret[0].(ListenerID)
+	return ret0
+}
+
+func (_mr *_MockOperatorRecorder) RegisterListener(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "RegisterListener", arg0)
+}
+
+func (_m *MockOperator) DeregisterListener(_param0 ListenerID) {
+	_m.ctrl.Call(_m, "DeregisterListener", _param0)
+}
+
+func (_mr *_MockOperatorRecorder) DeregisterListener(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeregisterListener", arg0)
+}
+
+// Mock of Listener interface
+type MockListener struct {
+	ctrl     *gomock.Controller
+	recorder *_MockListenerRecorder
+}
+
+// Recorder for MockListener (not exported)
+type _MockListenerRecorder struct {
+	mock *MockListener
+}
+
+func NewMockListener(ctrl *gomock.Controller) *MockListener {
+	mock := &MockListener{ctrl: ctrl}
+	mock.recorder = &_MockListenerRecorder{mock}
+	return mock
+}
+
+func (_m *MockListener) EXPECT() *_MockListenerRecorder {
+	return _m.recorder
+}
+
+func (_m *MockListener) OnProcessTerminate(desc string) {
+	_m.ctrl.Call(_m, "OnProcessTerminate", desc)
+}
+
+func (_mr *_MockListenerRecorder) OnProcessTerminate(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "OnProcessTerminate", arg0)
+}
+
+func (_m *MockListener) OnHeartbeatTimeout(lastTs time.Time) {
+	_m.ctrl.Call(_m, "OnHeartbeatTimeout", lastTs)
+}
+
+func (_mr *_MockListenerRecorder) OnHeartbeatTimeout(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "OnHeartbeatTimeout", arg0)
+}
+
+func (_m *MockListener) OnOverwrite(desc string) {
+	_m.ctrl.Call(_m, "OnOverwrite", desc)
+}
+
+func (_mr *_MockListenerRecorder) OnOverwrite(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "OnOverwrite", arg0)
+}
+
 // Mock of Options interface
 type MockOptions struct {
 	ctrl     *gomock.Controller
@@ -121,6 +184,16 @@ func NewMockOptions(ctrl *gomock.Controller) *MockOptions {
 
 func (_m *MockOptions) EXPECT() *_MockOptionsRecorder {
 	return _m.recorder
+}
+
+func (_m *MockOptions) Validate() error {
+	ret := _m.ctrl.Call(_m, "Validate")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) Validate() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Validate")
 }
 
 func (_m *MockOptions) SetInstrumentOptions(_param0 instrument.Options) Options {
@@ -201,4 +274,145 @@ func (_m *MockOptions) TransferBufferSize() int {
 
 func (_mr *_MockOptionsRecorder) TransferBufferSize() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "TransferBufferSize")
+}
+
+func (_m *MockOptions) SetHeartbeatOptions(_param0 HeartbeatOptions) Options {
+	ret := _m.ctrl.Call(_m, "SetHeartbeatOptions", _param0)
+	ret0, _ := ret[0].(Options)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SetHeartbeatOptions(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetHeartbeatOptions", arg0)
+}
+
+func (_m *MockOptions) HeartbeatOptions() HeartbeatOptions {
+	ret := _m.ctrl.Call(_m, "HeartbeatOptions")
+	ret0, _ := ret[0].(HeartbeatOptions)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) HeartbeatOptions() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "HeartbeatOptions")
+}
+
+// Mock of HeartbeatOptions interface
+type MockHeartbeatOptions struct {
+	ctrl     *gomock.Controller
+	recorder *_MockHeartbeatOptionsRecorder
+}
+
+// Recorder for MockHeartbeatOptions (not exported)
+type _MockHeartbeatOptionsRecorder struct {
+	mock *MockHeartbeatOptions
+}
+
+func NewMockHeartbeatOptions(ctrl *gomock.Controller) *MockHeartbeatOptions {
+	mock := &MockHeartbeatOptions{ctrl: ctrl}
+	mock.recorder = &_MockHeartbeatOptionsRecorder{mock}
+	return mock
+}
+
+func (_m *MockHeartbeatOptions) EXPECT() *_MockHeartbeatOptionsRecorder {
+	return _m.recorder
+}
+
+func (_m *MockHeartbeatOptions) SetEnabled(_param0 bool) HeartbeatOptions {
+	ret := _m.ctrl.Call(_m, "SetEnabled", _param0)
+	ret0, _ := ret[0].(HeartbeatOptions)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) SetEnabled(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetEnabled", arg0)
+}
+
+func (_m *MockHeartbeatOptions) Enabled() bool {
+	ret := _m.ctrl.Call(_m, "Enabled")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) Enabled() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Enabled")
+}
+
+func (_m *MockHeartbeatOptions) SetNowFn(_param0 NowFn) HeartbeatOptions {
+	ret := _m.ctrl.Call(_m, "SetNowFn", _param0)
+	ret0, _ := ret[0].(HeartbeatOptions)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) SetNowFn(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetNowFn", arg0)
+}
+
+func (_m *MockHeartbeatOptions) NowFn() NowFn {
+	ret := _m.ctrl.Call(_m, "NowFn")
+	ret0, _ := ret[0].(NowFn)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) NowFn() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NowFn")
+}
+
+func (_m *MockHeartbeatOptions) SetInterval(_param0 time.Duration) HeartbeatOptions {
+	ret := _m.ctrl.Call(_m, "SetInterval", _param0)
+	ret0, _ := ret[0].(HeartbeatOptions)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) SetInterval(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInterval", arg0)
+}
+
+func (_m *MockHeartbeatOptions) Interval() time.Duration {
+	ret := _m.ctrl.Call(_m, "Interval")
+	ret0, _ := ret[0].(time.Duration)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) Interval() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Interval")
+}
+
+func (_m *MockHeartbeatOptions) SetCheckInterval(_param0 time.Duration) HeartbeatOptions {
+	ret := _m.ctrl.Call(_m, "SetCheckInterval", _param0)
+	ret0, _ := ret[0].(HeartbeatOptions)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) SetCheckInterval(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetCheckInterval", arg0)
+}
+
+func (_m *MockHeartbeatOptions) CheckInterval() time.Duration {
+	ret := _m.ctrl.Call(_m, "CheckInterval")
+	ret0, _ := ret[0].(time.Duration)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) CheckInterval() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CheckInterval")
+}
+
+func (_m *MockHeartbeatOptions) SetTimeout(_param0 time.Duration) HeartbeatOptions {
+	ret := _m.ctrl.Call(_m, "SetTimeout", _param0)
+	ret0, _ := ret[0].(HeartbeatOptions)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) SetTimeout(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetTimeout", arg0)
+}
+
+func (_m *MockHeartbeatOptions) Timeout() time.Duration {
+	ret := _m.ctrl.Call(_m, "Timeout")
+	ret0, _ := ret[0].(time.Duration)
+	return ret0
+}
+
+func (_mr *_MockHeartbeatOptionsRecorder) Timeout() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Timeout")
 }
