@@ -22,27 +22,19 @@ package fs
 
 import (
 	"hash/crc32"
-	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func newTempFile(t *testing.T, content []byte) *os.File {
-	tmpfile, err := ioutil.TempFile("", "example")
-	require.NoError(t, err)
-	n, err := tmpfile.Write(content)
-	require.NoError(t, err)
-	require.Equal(t, len(content), n)
-	require.NoError(t, tmpfile.Close())
-	return tmpfile
-}
-
 func TestIterChecksumLargeBuffer(t *testing.T) {
-	content := []byte("temporary file content")
-	tmpfile := newTempFile(t, content)
-	defer os.Remove(tmpfile.Name()) // clean up
+	var (
+		content = []byte("temporary file content")
+		tmpdir  = newTempDir(t)
+		tmpfile = newTempFile(t, tmpdir, content)
+	)
+	defer os.RemoveAll(tmpdir) // clean up
 
 	largeBufferSize := 100
 	iter, err := NewSizedFileReaderIter(tmpfile.Name(), largeBufferSize)
@@ -61,9 +53,12 @@ func TestIterChecksumLargeBuffer(t *testing.T) {
 }
 
 func TestIterChecksumSmallBuffer(t *testing.T) {
-	content := []byte("temporary file content")
-	tmpfile := newTempFile(t, content)
-	defer os.Remove(tmpfile.Name()) // clean up
+	var (
+		content = []byte("temporary file content")
+		tmpdir  = newTempDir(t)
+		tmpfile = newTempFile(t, tmpdir, content)
+	)
+	defer os.RemoveAll(tmpdir)
 
 	largeBufferSize := 1
 	iter, err := NewSizedFileReaderIter(tmpfile.Name(), largeBufferSize)
