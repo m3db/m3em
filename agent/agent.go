@@ -32,6 +32,7 @@ import (
 
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
+	"github.com/m3db/m3em/os/fs"
 
 	xerrors "github.com/m3db/m3x/errors"
 	xlog "github.com/m3db/m3x/log"
@@ -93,7 +94,7 @@ func New(
 		logger:  opts.InstrumentOptions().Logger(),
 		metrics: newAgentMetrics(opts.InstrumentOptions().MetricsScope()),
 	}
-	go agent.reportMetrics()
+	go agent.reportMetrics() // TODO(prateek): don't leak this
 	return agent, nil
 }
 
@@ -277,13 +278,7 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	o.Lock()
 	defer o.Unlock()
 
-	var (
-		multiErr xerrors.MultiError
-		// workingDir = o.opts.WorkingDirectory()
-		// err        = os.RemoveAll(workingDir) // TODO(prateek): does this need to be done, also, what about data directory
-		// multiErr = multiErr.Add(err)
-	)
-
+	var multiErr xerrors.MultiError
 	if o.processMonitor != nil {
 		o.logger.Infof("processMonitor exists, attempting to Close()")
 		if err := o.processMonitor.Close(); err != nil {
@@ -293,6 +288,10 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 		o.processMonitor = nil
 		o.running = false
 	}
+
+	// remove any temporary resources stored in the working directory
+	err := fs.RemoveContents(o.opts.WorkingDirectory())
+	multiErr = multiErr.Add(err)
 
 	o.logger.Infof("releasing host resources")
 	if err := o.opts.ReleaseHostResourcesFn()(); err != nil {
