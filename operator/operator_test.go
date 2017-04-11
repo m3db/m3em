@@ -145,7 +145,6 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 	require.True(t, overwritten)
 }
 
-// TODO(prateek): add test case for heartbeating timeout
 func TestHeartbeatingTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
