@@ -349,12 +349,16 @@ type opHeartbeater struct {
 	iopts         instrument.Options
 	listeners     *listenerGroup
 	opClient      m3em.OperatorClient
+	clientGetFn   clientGetFn
 	client        m3em.Operator_HeartbeatClient
 	clientCancel  context.CancelFunc
 	running       bool
 	stopChan      chan bool
 	lastHeartbeat heartbeat
 }
+
+// clientGetFn is used for testing
+type clientGetFn func() m3em.Operator_HeartbeatClient
 
 type heartbeat struct {
 	ts             time.Time
@@ -367,13 +371,19 @@ func newHeartbeater(
 	iopts instrument.Options,
 	opts HeartbeatOptions,
 ) *opHeartbeater {
-	return &opHeartbeater{
+	h := &opHeartbeater{
 		opClient:  client,
 		opts:      opts,
 		iopts:     iopts,
 		listeners: lg,
 		stopChan:  make(chan bool, 1),
 	}
+	h.clientGetFn = h.getClient
+	return h
+}
+
+func (h *opHeartbeater) getClient() m3em.Operator_HeartbeatClient {
+	return h.client
 }
 
 func (h *opHeartbeater) start() error {
@@ -442,7 +452,8 @@ func (h *opHeartbeater) monitorLoop() {
 func (h *opHeartbeater) heartbeatLoop() {
 	defer h.wg.Done()
 	for {
-		msg, err := h.client.Recv()
+		client := h.clientGetFn()
+		msg, err := client.Recv()
 		if err == context.Canceled {
 			h.iopts.Logger().Infof("heartbeating cancelled")
 			break

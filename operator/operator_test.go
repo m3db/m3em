@@ -35,6 +35,7 @@ func TestHeartbeaterCancellation(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
+		lock    sync.Mutex
 		lg      = newListenerGroup()
 		opts    = newTestHeartbeatOpts()
 		iopts   = instrument.NewOptions()
@@ -51,13 +52,20 @@ func TestHeartbeaterCancellation(t *testing.T) {
 	}).Return(hClient, nil)
 
 	hb := newHeartbeater(client, lg, iopts, opts)
+	hb.clientGetFn = func() m3em.Operator_HeartbeatClient {
+		lock.Lock()
+		defer lock.Unlock()
+		return hb.client
+	}
 	require.NoError(t, hb.start())
 
 	notCalled := true
 	hb.clientCancel = func() {
 		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
 		hClient.EXPECT().Recv().Return(nil, context.Canceled)
+		lock.Lock()
 		hb.client = hClient
+		lock.Unlock()
 		notCalled = false
 	}
 
