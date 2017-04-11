@@ -68,13 +68,21 @@ type Operator interface {
 // ListenerID is a unique identifier for a registered listener
 type ListenerID int
 
-// Listener ...
+// Listener provides callbacks invoked upon remote process state transitions
 type Listener interface {
+	// OnProcessTerminate is invoked when the remote process being run terminates
 	OnProcessTerminate(desc string)
 
-	OnHeartbeatTimeout(lastTs time.Time)
+	// OnHeartbeatTimeout is invoked upon remote heartbeats having timed-out
+	OnHeartbeatTimeout(lastHeartbeatTs time.Time)
 
+	// OnOverwrite is invoked if remote agent control is overwritten by another
+	// coordinator
 	OnOverwrite(desc string)
+
+	// OnInternalError is invoked if we recieve an unexpected error during heartbeating.
+	// It should never be invoked during regular executions
+	OnInternalError(err error)
 }
 
 // Options returns options pertaining to `Operator` configuration.

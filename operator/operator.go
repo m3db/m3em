@@ -62,7 +62,7 @@ func New(
 	var (
 		client      = m3em.NewOperatorClient(conn)
 		listeners   = newListenerGroup()
-		heartbeater = newHeartbeater(client, opts.InstrumentOptions(), opts.HeartbeatOptions(), listeners)
+		heartbeater = newHeartbeater(client, listeners, opts.InstrumentOptions(), opts.HeartbeatOptions())
 	)
 
 	return &operator{
@@ -87,7 +87,7 @@ func (o *operator) Setup(
 	}
 
 	if o.opts.HeartbeatOptions().Enabled() {
-		if err := o.startHeartbeat(); err != nil {
+		if err := o.heartbeater.start(); err != nil {
 			return fmt.Errorf("unable to heartbeat: %v", err)
 		}
 	}
@@ -100,10 +100,6 @@ func (o *operator) Setup(
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}
 	return nil
-}
-
-func (o *operator) startHeartbeat() error {
-	return o.heartbeater.start()
 }
 
 func (o *operator) sendSetup(token string, force bool) error {
@@ -239,6 +235,52 @@ func (o *operator) DeregisterListener(token ListenerID) {
 	o.listeners.remove(int(token))
 }
 
+// NewListener creates a new listener
+func NewListener(
+	onProcessTerminate func(string),
+	onHeartbeatTimeout func(last time.Time),
+	onOverwrite func(string),
+	onInternalError func(err error),
+) Listener {
+	return &listener{
+		onProcessTerminate: onProcessTerminate,
+		onHeartbeatTimeout: onHeartbeatTimeout,
+		onOverwrite:        onOverwrite,
+		onInternalError:    onInternalError,
+	}
+}
+
+type listener struct {
+	onProcessTerminate func(string)
+	onHeartbeatTimeout func(last time.Time)
+	onOverwrite        func(string)
+	onInternalError    func(err error)
+}
+
+func (l *listener) OnProcessTerminate(desc string) {
+	if l.onProcessTerminate != nil {
+		l.onProcessTerminate(desc)
+	}
+}
+
+func (l *listener) OnHeartbeatTimeout(lastHeartbeatTs time.Time) {
+	if l.onHeartbeatTimeout != nil {
+		l.onHeartbeatTimeout(lastHeartbeatTs)
+	}
+}
+
+func (l *listener) OnOverwrite(desc string) {
+	if l.onOverwrite != nil {
+		l.onOverwrite(desc)
+	}
+}
+
+func (l *listener) OnInternalError(err error) {
+	if l.onInternalError != nil {
+		l.onInternalError(err)
+	}
+}
+
 type listenerGroup struct {
 	sync.Mutex
 	elems map[int]Listener
@@ -289,17 +331,24 @@ func (lg *listenerGroup) notifyOverwrite(desc string) {
 	}
 }
 
+func (lg *listenerGroup) notifyInternalError(err error) {
+	lg.Lock()
+	defer lg.Unlock()
+	for _, l := range lg.elems {
+		go l.OnInternalError(err)
+	}
+}
+
 // Heartbeating from agent -> operator: this is to ensure capture of asynchronous
 // error conditions, e.g. the child process kicked off by the agent dies, but the
 // operator is not informed.
-
 type opHeartbeater struct {
 	sync.RWMutex
-	wg            *sync.WaitGroup
+	wg            sync.WaitGroup
 	opts          HeartbeatOptions
 	iopts         instrument.Options
-	opClient      m3em.OperatorClient
 	listeners     *listenerGroup
+	opClient      m3em.OperatorClient
 	client        m3em.Operator_HeartbeatClient
 	clientCancel  context.CancelFunc
 	running       bool
@@ -314,9 +363,9 @@ type heartbeat struct {
 
 func newHeartbeater(
 	client m3em.OperatorClient,
+	lg *listenerGroup,
 	iopts instrument.Options,
 	opts HeartbeatOptions,
-	lg *listenerGroup,
 ) *opHeartbeater {
 	return &opHeartbeater{
 		opClient:  client,
@@ -364,16 +413,17 @@ func (h *opHeartbeater) lastHeartbeatTime() time.Time {
 func (h *opHeartbeater) monitorLoop() {
 	defer h.wg.Done()
 	var (
+		monitor         = true
 		checkInterval   = h.opts.CheckInterval()
 		timeoutInterval = h.opts.Timeout()
 		nowFn           = h.opts.NowFn()
 		lastCheck       time.Time
 	)
 
-	for {
+	for monitor {
 		select {
 		case <-h.stopChan:
-			break // breaking out of the for loop
+			monitor = false
 		default:
 			last := h.lastHeartbeatTime()
 			if last == lastCheck {
@@ -393,9 +443,14 @@ func (h *opHeartbeater) heartbeatLoop() {
 	defer h.wg.Done()
 	for {
 		msg, err := h.client.Recv()
-		if err == io.EOF || err != nil {
-			h.iopts.Logger().Warnf("unexpected error while streaming heartbeat msgs: %v", err)
-			break // TODO(prateek): this should trigger a new function in Listener
+		if err == context.Canceled {
+			h.iopts.Logger().Infof("heartbeating cancelled")
+			break
+		} else if err == io.EOF || err != nil {
+			heartbeatErr := fmt.Errorf("unexpected error while streaming heartbeat msgs: %v", err)
+			h.iopts.Logger().Warn(heartbeatErr.Error())
+			h.listeners.notifyInternalError(heartbeatErr)
+			break
 		}
 		h.processHeartbeatMsg(msg)
 	}
@@ -431,11 +486,15 @@ func (h *opHeartbeater) processHeartbeatMsg(msg *m3em.HeartbeatResponse) {
 		h.stop()
 
 	default:
-		panic(fmt.Errorf("received unknown heartbeat msg: %+v", msg))
+		err := fmt.Errorf("received unknown heartbeat msg")
+		if msg != nil {
+			err = fmt.Errorf("received unknown heartbeat msg: %v", *msg)
+		}
+		h.listeners.notifyInternalError(err)
+		h.stop()
 	}
 }
 
-// TODO(prateek): should this also notify?
 func (h *opHeartbeater) stop() {
 	h.Lock()
 	if !h.running {

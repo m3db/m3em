@@ -72,4 +72,8 @@ message HeartbeatResponse {
   HeartbeatCode code           = 1;
   string        error          = 2;
   bool          processRunning = 3;
+  // token
+  // config hash
+  // test process hash
+  // TODO(prateek): make heartbeat happen at setup time, pickup state on any pending running operator services
 }
