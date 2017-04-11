@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,12 +79,15 @@ func TestHeartbeatingUnknownCode(t *testing.T) {
 	)
 
 	var (
+		lock                  sync.Mutex
 		internalErrorNotified = false
 		lnr                   = newTestListener(t)
 	)
 	lnr.onInternalError = func(err error) {
 		println(err.Error())
+		lock.Lock()
 		internalErrorNotified = true
+		lock.Unlock()
 	}
 	lg.add(lnr)
 
@@ -98,6 +102,8 @@ func TestHeartbeatingUnknownCode(t *testing.T) {
 	hb := newHeartbeater(client, lg, iopts, opts)
 	require.NoError(t, hb.start())
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	lock.Lock()
+	defer lock.Unlock()
 	require.True(t, internalErrorNotified)
 }
 
@@ -114,11 +120,14 @@ func TestHeartbeatingEOF(t *testing.T) {
 	)
 
 	var (
+		lock                  sync.Mutex
 		internalErrorNotified = false
 		lnr                   = newTestListener(t)
 	)
 	lnr.onInternalError = func(err error) {
+		lock.Lock()
 		internalErrorNotified = true
+		lock.Unlock()
 	}
 	lg.add(lnr)
 
@@ -130,6 +139,8 @@ func TestHeartbeatingEOF(t *testing.T) {
 	hb := newHeartbeater(client, lg, iopts, opts)
 	require.NoError(t, hb.start())
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	lock.Lock()
+	defer lock.Unlock()
 	require.True(t, internalErrorNotified)
 }
 
@@ -146,11 +157,14 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 	)
 
 	var (
+		lock              sync.Mutex
 		processTerminated = false
 		lnr               = newTestListener(t)
 	)
 	lnr.onProcessTerminate = func(string) {
+		lock.Lock()
 		processTerminated = true
+		lock.Unlock()
 	}
 	lg.add(lnr)
 
@@ -168,6 +182,8 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 	hb := newHeartbeater(client, lg, iopts, opts)
 	require.NoError(t, hb.start())
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	lock.Lock()
+	defer lock.Unlock()
 	require.True(t, processTerminated)
 }
 
@@ -184,11 +200,14 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 	)
 
 	var (
+		lock        sync.Mutex
 		overwritten = false
 		lnr         = newTestListener(t)
 	)
 	lnr.onOverwrite = func(string) {
+		lock.Lock()
 		overwritten = true
+		lock.Unlock()
 	}
 	lg.add(lnr)
 
@@ -202,5 +221,7 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 	hb := newHeartbeater(client, lg, iopts, opts)
 	require.NoError(t, hb.start())
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	lock.Lock()
+	defer lock.Unlock()
 	require.True(t, overwritten)
 }
