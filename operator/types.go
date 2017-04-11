@@ -79,10 +79,6 @@ type Listener interface {
 	// OnOverwrite is invoked if remote agent control is overwritten by another
 	// coordinator
 	OnOverwrite(desc string)
-
-	// OnInternalError is invoked if we recieve an unexpected error during heartbeating.
-	// It should never be invoked during regular executions
-	OnInternalError(err error)
 }
 
 // Options returns options pertaining to `Operator` configuration.

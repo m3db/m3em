@@ -8,7 +8,6 @@ service Operator {
 	rpc Start(StartRequest)              returns (StartResponse);
 	rpc Stop(StopRequest)                returns (StopResponse);
 	rpc Teardown(TeardownRequest)        returns (TeardownResponse);
-  rpc Heartbeat(HeartbeatRequest)      returns (stream HeartbeatResponse);
 }
 
 enum FileType {
@@ -18,9 +17,14 @@ enum FileType {
   // log file
 }
 
+// TODO(prateek): make heartbeat happen at setup time,
+// pickup state on any pending running operator services
 message SetupRequest {
-  string token = 1;
-  bool   force = 2;
+  string token                    = 1;
+  bool   force                    = 2;
+  bool   heartbeat_enabled        = 3;
+  string heartbeat_endpoint       = 4;
+  uint32 heartbeat_frequency_secs = 5;
 }
 
 message SetupResponse {
@@ -55,25 +59,4 @@ message TeardownRequest {
 }
 
 message TeardownResponse {
-}
-
-message HeartbeatRequest {
-  uint32 frequency_secs = 1;
-}
-
-enum HeartbeatCode {
-  HEARTBEAT_CODE_UNKNOWN             = 0;
-  HEARTBEAT_CODE_HEALTHY             = 1;
-  HEARTBEAT_CODE_PROCESS_TERMINATION = 2;
-  HEARTBEAT_CODE_OVERWRITTEN         = 3;
-}
-
-message HeartbeatResponse {
-  HeartbeatCode code           = 1;
-  string        error          = 2;
-  bool          processRunning = 3;
-  // token
-  // config hash
-  // test process hash
-  // TODO(prateek): make heartbeat happen at setup time, pickup state on any pending running operator services
 }

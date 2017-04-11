@@ -149,8 +149,8 @@ func (_mr *_MockListenerRecorder) OnProcessTerminate(arg0 interface{}) *gomock.C
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "OnProcessTerminate", arg0)
 }
 
-func (_m *MockListener) OnHeartbeatTimeout(lastTs time.Time) {
-	_m.ctrl.Call(_m, "OnHeartbeatTimeout", lastTs)
+func (_m *MockListener) OnHeartbeatTimeout(lastHeartbeatTs time.Time) {
+	_m.ctrl.Call(_m, "OnHeartbeatTimeout", lastHeartbeatTs)
 }
 
 func (_mr *_MockListenerRecorder) OnHeartbeatTimeout(arg0 interface{}) *gomock.Call {

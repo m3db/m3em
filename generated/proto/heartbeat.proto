@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package heartbeat;
+
+service Heartbeater {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+message HeartbeatRequest {
+  HeartbeatCode code            = 1;
+  string        error           = 2;
+  bool          processRunning  = 3;
+  string        token           = 4;
+  uint32        config_checksum = 5;
+  uint32        binary_checksum = 6;
+}
+
+enum HeartbeatCode {
+  UNKNOWN             = 0;
+  HEALTHY             = 1;
+  PROCESS_TERMINATION = 2;
+  OVERWRITTEN         = 3;
+}
+
+message HeartbeatResponse {
+}

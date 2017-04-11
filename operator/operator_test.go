@@ -2,12 +2,11 @@ package operator
 
 import (
 	"context"
-	"io"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/m3db/m3em/generated/proto/m3em"
+	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3x/instrument"
@@ -16,9 +15,9 @@ import (
 
 func newTestHeartbeatOpts() HeartbeatOptions {
 	return NewHeartbeatOptions().
-		SetCheckInterval(100 * time.Millisecond).
-		SetInterval(2 * time.Second).
-		SetTimeout(10 * time.Second)
+		SetCheckInterval(10 * time.Millisecond).
+		SetInterval(20 * time.Millisecond).
+		SetTimeout(100 * time.Millisecond)
 }
 
 func newTestListener(t *testing.T) *listener {
@@ -26,52 +25,28 @@ func newTestListener(t *testing.T) *listener {
 		onProcessTerminate: func(desc string) { require.Fail(t, "onProcessTerminate invoked %s", desc) },
 		onHeartbeatTimeout: func(ts time.Time) { require.Fail(t, "onHeartbeatTimeout invoked %s", ts.String()) },
 		onOverwrite:        func(desc string) { require.Fail(t, "onOverwrite invoked %s", desc) },
-		onInternalError:    func(err error) { require.Fail(t, "onInternalError invoked %s", err.Error()) },
 	}
 }
 
-func TestHeartbeaterCancellation(t *testing.T) {
+func TestHeartbeaterSimple(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	var (
-		lock    sync.Mutex
-		lg      = newListenerGroup()
-		opts    = newTestHeartbeatOpts()
-		iopts   = instrument.NewOptions()
-		client  = m3em.NewMockOperatorClient(ctrl)
-		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
+		lg       = newListenerGroup()
+		opts     = newTestHeartbeatOpts()
+		iopts    = instrument.NewOptions()
+		hbServer = newHeartbeater(lg, opts, iopts)
 	)
-	hClient.EXPECT().Recv().Return(&m3em.HeartbeatResponse{
-		Code:           m3em.HeartbeatCode_HEARTBEAT_CODE_HEALTHY,
-		ProcessRunning: false,
-	}, nil).AnyTimes()
+	require.NoError(t, hbServer.start())
 
-	client.EXPECT().Heartbeat(gomock.Any(), &m3em.HeartbeatRequest{
-		FrequencySecs: uint32(opts.Interval().Seconds()),
-	}).Return(hClient, nil)
-
-	hb := newHeartbeater(client, lg, iopts, opts)
-	hb.clientGetFn = func() m3em.Operator_HeartbeatClient {
-		lock.Lock()
-		defer lock.Unlock()
-		return hb.client
-	}
-	require.NoError(t, hb.start())
-
-	notCalled := true
-	hb.clientCancel = func() {
-		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
-		hClient.EXPECT().Recv().Return(nil, context.Canceled)
-		lock.Lock()
-		hb.client = hClient
-		lock.Unlock()
-		notCalled = false
-	}
-
+	hbServer.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			Code:           hb.HeartbeatCode_HEALTHY,
+			ProcessRunning: false,
+		})
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
-	hb.stop()
-	require.False(t, notCalled)
+	hbServer.stop()
 }
 
 func TestHeartbeatingUnknownCode(t *testing.T) {
@@ -79,77 +54,21 @@ func TestHeartbeatingUnknownCode(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
-		lg      = newListenerGroup()
-		opts    = newTestHeartbeatOpts()
-		iopts   = instrument.NewOptions()
-		client  = m3em.NewMockOperatorClient(ctrl)
-		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
+		lg       = newListenerGroup()
+		opts     = newTestHeartbeatOpts()
+		iopts    = instrument.NewOptions()
+		hbServer = newHeartbeater(lg, opts, iopts)
 	)
+	require.NoError(t, hbServer.start())
 
-	var (
-		lock                  sync.Mutex
-		internalErrorNotified = false
-		lnr                   = newTestListener(t)
-	)
-	lnr.onInternalError = func(err error) {
-		println(err.Error())
-		lock.Lock()
-		internalErrorNotified = true
-		lock.Unlock()
-	}
-	lg.add(lnr)
-
-	hClient.EXPECT().Recv().Return(&m3em.HeartbeatResponse{
-		Code: m3em.HeartbeatCode_HEARTBEAT_CODE_UNKNOWN,
-	}, nil)
-
-	client.EXPECT().Heartbeat(gomock.Any(), &m3em.HeartbeatRequest{
-		FrequencySecs: uint32(opts.Interval().Seconds()),
-	}).Return(hClient, nil)
-
-	hb := newHeartbeater(client, lg, iopts, opts)
-	require.NoError(t, hb.start())
+	_, err := hbServer.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			Code:           hb.HeartbeatCode_UNKNOWN,
+			ProcessRunning: false,
+		})
+	require.Error(t, err)
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
-	lock.Lock()
-	defer lock.Unlock()
-	require.True(t, internalErrorNotified)
-}
-
-func TestHeartbeatingEOF(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var (
-		lg      = newListenerGroup()
-		opts    = newTestHeartbeatOpts()
-		iopts   = instrument.NewOptions()
-		client  = m3em.NewMockOperatorClient(ctrl)
-		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
-	)
-
-	var (
-		lock                  sync.Mutex
-		internalErrorNotified = false
-		lnr                   = newTestListener(t)
-	)
-	lnr.onInternalError = func(err error) {
-		lock.Lock()
-		internalErrorNotified = true
-		lock.Unlock()
-	}
-	lg.add(lnr)
-
-	hClient.EXPECT().Recv().Return(nil, io.EOF)
-	client.EXPECT().Heartbeat(gomock.Any(), &m3em.HeartbeatRequest{
-		FrequencySecs: uint32(opts.Interval().Seconds()),
-	}).Return(hClient, nil)
-
-	hb := newHeartbeater(client, lg, iopts, opts)
-	require.NoError(t, hb.start())
-	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
-	lock.Lock()
-	defer lock.Unlock()
-	require.True(t, internalErrorNotified)
+	hbServer.stop()
 }
 
 func TestHeartbeatingProcessTermination(t *testing.T) {
@@ -157,11 +76,9 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
-		lg      = newListenerGroup()
-		opts    = newTestHeartbeatOpts()
-		iopts   = instrument.NewOptions()
-		client  = m3em.NewMockOperatorClient(ctrl)
-		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
+		lg    = newListenerGroup()
+		opts  = newTestHeartbeatOpts()
+		iopts = instrument.NewOptions()
 	)
 
 	var (
@@ -176,20 +93,16 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 	}
 	lg.add(lnr)
 
-	hClient.EXPECT().Recv().Do(func() {
-		time.Sleep(time.Hour)
-	}).After(
-		hClient.EXPECT().Recv().Return(&m3em.HeartbeatResponse{
-			Code: m3em.HeartbeatCode_HEARTBEAT_CODE_PROCESS_TERMINATION,
-		}, nil),
-	)
-	client.EXPECT().Heartbeat(gomock.Any(), &m3em.HeartbeatRequest{
-		FrequencySecs: uint32(opts.Interval().Seconds()),
-	}).Return(hClient, nil)
-
-	hb := newHeartbeater(client, lg, iopts, opts)
-	require.NoError(t, hb.start())
+	hbServer := newHeartbeater(lg, opts, iopts)
+	require.NoError(t, hbServer.start())
+	_, err := hbServer.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			Code: hb.HeartbeatCode_PROCESS_TERMINATION,
+		})
+	require.NoError(t, err)
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	hbServer.stop()
+
 	lock.Lock()
 	defer lock.Unlock()
 	require.True(t, processTerminated)
@@ -200,11 +113,9 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
-		lg      = newListenerGroup()
-		opts    = newTestHeartbeatOpts()
-		iopts   = instrument.NewOptions()
-		client  = m3em.NewMockOperatorClient(ctrl)
-		hClient = m3em.NewMockOperator_HeartbeatClient(ctrl)
+		lg    = newListenerGroup()
+		opts  = newTestHeartbeatOpts()
+		iopts = instrument.NewOptions()
 	)
 
 	var (
@@ -219,17 +130,64 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 	}
 	lg.add(lnr)
 
-	hClient.EXPECT().Recv().Return(&m3em.HeartbeatResponse{
-		Code: m3em.HeartbeatCode_HEARTBEAT_CODE_OVERWRITTEN,
-	}, nil)
-	client.EXPECT().Heartbeat(gomock.Any(), &m3em.HeartbeatRequest{
-		FrequencySecs: uint32(opts.Interval().Seconds()),
-	}).Return(hClient, nil)
-
-	hb := newHeartbeater(client, lg, iopts, opts)
-	require.NoError(t, hb.start())
+	hbServer := newHeartbeater(lg, opts, iopts)
+	require.NoError(t, hbServer.start())
+	_, err := hbServer.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			Code: hb.HeartbeatCode_OVERWRITTEN,
+		})
+	require.NoError(t, err)
 	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	hbServer.stop()
+
 	lock.Lock()
 	defer lock.Unlock()
 	require.True(t, overwritten)
+}
+
+// TODO(prateek): add test case for heartbeating timeout
+func TestHeartbeatingTimeout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		now       = time.Now()
+		callCount = 0
+		nowFn     = func() time.Time {
+			callCount++
+			if callCount == 1 {
+				return now
+			}
+			return now.Add(time.Hour)
+		}
+		lg    = newListenerGroup()
+		opts  = newTestHeartbeatOpts().SetNowFn(nowFn)
+		iopts = instrument.NewOptions()
+	)
+
+	var (
+		lock     sync.Mutex
+		timedout = false
+		lnr      = newTestListener(t)
+	)
+	lnr.onHeartbeatTimeout = func(ts time.Time) {
+		lock.Lock()
+		timedout = true
+		lock.Unlock()
+	}
+	lg.add(lnr)
+
+	hbServer := newHeartbeater(lg, opts, iopts)
+	require.NoError(t, hbServer.start())
+	_, err := hbServer.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			Code: hb.HeartbeatCode_HEALTHY,
+		})
+	require.NoError(t, err)
+	time.Sleep(10 * time.Millisecond)
+	hbServer.stop()
+
+	lock.Lock()
+	defer lock.Unlock()
+	require.True(t, timedout)
 }

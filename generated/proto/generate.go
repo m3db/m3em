@@ -19,5 +19,6 @@
 // THE SOFTWARE.
 
 //go:generate protoc --go_out=plugins=grpc:./m3em/. operator.proto
+//go:generate protoc --go_out=plugins=grpc:./heartbeat/. heartbeat.proto
 
 package generated

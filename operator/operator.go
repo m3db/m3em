@@ -23,17 +23,18 @@ package operator
 import (
 	"context"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
 	"github.com/m3db/m3em/build"
+	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/fs"
 
 	"github.com/m3db/m3x/instrument"
 	"github.com/m3db/m3x/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 type operator struct {
@@ -43,7 +44,7 @@ type operator struct {
 	opts        Options
 	logger      xlog.Logger
 	listeners   *listenerGroup
-	heartbeater *opHeartbeater
+	heartbeater *opHeartbeatServer
 }
 
 // New creates a new operator
@@ -62,7 +63,7 @@ func New(
 	var (
 		client      = m3em.NewOperatorClient(conn)
 		listeners   = newListenerGroup()
-		heartbeater = newHeartbeater(client, listeners, opts.InstrumentOptions(), opts.HeartbeatOptions())
+		heartbeater = newHeartbeater(listeners, opts.HeartbeatOptions(), opts.InstrumentOptions())
 	)
 
 	return &operator{
@@ -82,15 +83,24 @@ func (o *operator) Setup(
 	token string,
 	force bool,
 ) error {
-	if err := o.sendSetup(token, force); err != nil {
+	freq := uint32(o.opts.HeartbeatOptions().Interval().Seconds())
+	err := o.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := o.client.Setup(ctx, &m3em.SetupRequest{
+			Token:                  token,
+			Force:                  force,
+			HeartbeatEnabled:       o.opts.HeartbeatOptions().Enabled(),
+			HeartbeatEndpoint:      "", // TOOD(prateek): heartbeat endpoint???
+			HeartbeatFrequencySecs: freq,
+		})
+		return err
+	})
+	if err != nil {
 		return fmt.Errorf("unable to setup: %v", err)
 	}
 
-	if o.opts.HeartbeatOptions().Enabled() {
-		if err := o.heartbeater.start(); err != nil {
-			return fmt.Errorf("unable to heartbeat: %v", err)
-		}
-	}
+	// TODO(prateek): wait till heartbeating starts
+	// if o.opts.HeartbeatOptions().Enabled() { }
 
 	if err := o.sendBuild(bld, force); err != nil {
 		return fmt.Errorf("unable to transfer build: %v", err)
@@ -99,18 +109,8 @@ func (o *operator) Setup(
 	if err := o.sendConfig(conf, force); err != nil {
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}
-	return nil
-}
 
-func (o *operator) sendSetup(token string, force bool) error {
-	return o.opts.Retrier().Attempt(func() error {
-		ctx := context.Background()
-		_, err := o.client.Setup(ctx, &m3em.SetupRequest{
-			Token: token,
-			Force: force,
-		})
-		return err
-	})
+	return nil
 }
 
 func (o *operator) sendBuild(
@@ -240,13 +240,11 @@ func NewListener(
 	onProcessTerminate func(string),
 	onHeartbeatTimeout func(last time.Time),
 	onOverwrite func(string),
-	onInternalError func(err error),
 ) Listener {
 	return &listener{
 		onProcessTerminate: onProcessTerminate,
 		onHeartbeatTimeout: onHeartbeatTimeout,
 		onOverwrite:        onOverwrite,
-		onInternalError:    onInternalError,
 	}
 }
 
@@ -254,7 +252,6 @@ type listener struct {
 	onProcessTerminate func(string)
 	onHeartbeatTimeout func(last time.Time)
 	onOverwrite        func(string)
-	onInternalError    func(err error)
 }
 
 func (l *listener) OnProcessTerminate(desc string) {
@@ -272,12 +269,6 @@ func (l *listener) OnHeartbeatTimeout(lastHeartbeatTs time.Time) {
 func (l *listener) OnOverwrite(desc string) {
 	if l.onOverwrite != nil {
 		l.onOverwrite(desc)
-	}
-}
-
-func (l *listener) OnInternalError(err error) {
-	if l.onInternalError != nil {
-		l.onInternalError(err)
 	}
 }
 
@@ -331,96 +322,80 @@ func (lg *listenerGroup) notifyOverwrite(desc string) {
 	}
 }
 
-func (lg *listenerGroup) notifyInternalError(err error) {
-	lg.Lock()
-	defer lg.Unlock()
-	for _, l := range lg.elems {
-		go l.OnInternalError(err)
-	}
-}
-
 // Heartbeating from agent -> operator: this is to ensure capture of asynchronous
 // error conditions, e.g. the child process kicked off by the agent dies, but the
 // operator is not informed.
-type opHeartbeater struct {
+type opHeartbeatServer struct {
 	sync.RWMutex
-	wg            sync.WaitGroup
-	opts          HeartbeatOptions
-	iopts         instrument.Options
-	listeners     *listenerGroup
-	opClient      m3em.OperatorClient
-	clientGetFn   clientGetFn
-	client        m3em.Operator_HeartbeatClient
-	clientCancel  context.CancelFunc
-	running       bool
-	stopChan      chan bool
-	lastHeartbeat heartbeat
+	opts            HeartbeatOptions
+	iopts           instrument.Options
+	listeners       *listenerGroup
+	lastHeartbeat   hb.HeartbeatRequest
+	lastHeartbeatTs time.Time
+	running         bool
+	stopChan        chan bool
+	wg              sync.WaitGroup
 }
 
-// clientGetFn is used for testing
-type clientGetFn func() m3em.Operator_HeartbeatClient
+func (h *opHeartbeatServer) Heartbeat(
+	ctx context.Context,
+	msg *hb.HeartbeatRequest,
+) (*hb.HeartbeatResponse, error) {
+	nowFn := h.opts.NowFn()
 
-type heartbeat struct {
-	ts             time.Time
-	processRunning bool
+	switch msg.GetCode() {
+	case hb.HeartbeatCode_HEALTHY:
+		h.updateLastHeartbeat(nowFn(), msg)
+
+	case hb.HeartbeatCode_PROCESS_TERMINATION:
+		h.updateLastHeartbeat(nowFn(), msg)
+		h.listeners.notifyTermination(msg.GetError())
+
+	case hb.HeartbeatCode_OVERWRITTEN:
+		h.listeners.notifyOverwrite(msg.GetError())
+		h.stop()
+
+	default:
+		return nil, grpc.Errorf(codes.InvalidArgument, "received unknown heartbeat msg: %v", *msg)
+	}
+
+	return &hb.HeartbeatResponse{}, nil
 }
 
 func newHeartbeater(
-	client m3em.OperatorClient,
 	lg *listenerGroup,
-	iopts instrument.Options,
 	opts HeartbeatOptions,
-) *opHeartbeater {
-	h := &opHeartbeater{
-		opClient:  client,
+	iopts instrument.Options,
+) *opHeartbeatServer {
+	h := &opHeartbeatServer{
 		opts:      opts,
 		iopts:     iopts,
 		listeners: lg,
 		stopChan:  make(chan bool, 1),
 	}
-	h.clientGetFn = h.getClient
 	return h
 }
 
-func (h *opHeartbeater) getClient() m3em.Operator_HeartbeatClient {
-	return h.client
-}
-
-func (h *opHeartbeater) start() error {
+func (h *opHeartbeatServer) start() error {
 	h.Lock()
 	defer h.Unlock()
 	if h.running {
 		return fmt.Errorf("already heartbeating, terminate existing process first")
 	}
 
-	var (
-		ctx, cancel = context.WithCancel(context.Background())
-		request     = &m3em.HeartbeatRequest{
-			FrequencySecs: uint32(h.opts.Interval().Seconds()),
-		}
-	)
-	heartbeatClient, err := h.opClient.Heartbeat(ctx, request)
-	if err != nil {
-		cancel()
-		return err
-	}
-
 	h.running = true
-	h.client = heartbeatClient
-	h.clientCancel = cancel
-	h.wg.Add(2)
-	go h.heartbeatLoop()
+	h.wg.Add(1)
 	go h.monitorLoop()
 	return nil
 }
 
-func (h *opHeartbeater) lastHeartbeatTime() time.Time {
+func (h *opHeartbeatServer) lastHeartbeatTime() time.Time {
 	h.RLock()
 	defer h.RUnlock()
-	return h.lastHeartbeat.ts
+	return h.lastHeartbeatTs
 }
 
-func (h *opHeartbeater) monitorLoop() {
+func (h *opHeartbeatServer) monitorLoop() {
 	defer h.wg.Done()
 	var (
 		monitor         = true
@@ -449,80 +424,22 @@ func (h *opHeartbeater) monitorLoop() {
 	}
 }
 
-func (h *opHeartbeater) heartbeatLoop() {
-	defer h.wg.Done()
-	for {
-		client := h.clientGetFn()
-		msg, err := client.Recv()
-		if err == context.Canceled {
-			h.iopts.Logger().Infof("heartbeating cancelled")
-			break
-		} else if err == io.EOF || err != nil {
-			heartbeatErr := fmt.Errorf("unexpected error while streaming heartbeat msgs: %v", err)
-			h.iopts.Logger().Warn(heartbeatErr.Error())
-			h.listeners.notifyInternalError(heartbeatErr)
-			break
-		}
-		h.processHeartbeatMsg(msg)
-	}
-}
-
-func (h *opHeartbeater) updateLastHeartbeat(hb heartbeat) {
+func (h *opHeartbeatServer) updateLastHeartbeat(ts time.Time, msg *hb.HeartbeatRequest) {
 	h.Lock()
-	h.lastHeartbeat = hb
+	h.lastHeartbeat = *msg
+	h.lastHeartbeatTs = ts
 	h.Unlock()
 }
 
-func (h *opHeartbeater) processHeartbeatMsg(msg *m3em.HeartbeatResponse) {
-	nowFn := h.opts.NowFn()
-
-	switch msg.GetCode() {
-	case m3em.HeartbeatCode_HEARTBEAT_CODE_HEALTHY:
-		newHeartbeat := heartbeat{
-			ts:             nowFn(),
-			processRunning: msg.GetProcessRunning(),
-		}
-		h.updateLastHeartbeat(newHeartbeat)
-
-	case m3em.HeartbeatCode_HEARTBEAT_CODE_PROCESS_TERMINATION:
-		newHeartbeat := heartbeat{
-			ts:             nowFn(),
-			processRunning: false,
-		}
-		h.updateLastHeartbeat(newHeartbeat)
-		h.listeners.notifyTermination(msg.GetError())
-
-	case m3em.HeartbeatCode_HEARTBEAT_CODE_OVERWRITTEN:
-		h.listeners.notifyOverwrite(msg.GetError())
-		h.stop()
-
-	default:
-		err := fmt.Errorf("received unknown heartbeat msg: %v", *msg)
-		h.listeners.notifyInternalError(err)
-		h.stop()
-	}
-}
-
-func (h *opHeartbeater) stop() {
+func (h *opHeartbeatServer) stop() {
 	h.Lock()
 	if !h.running {
-		h.resetWithLock()
 		h.Unlock()
 		return
 	}
 
-	h.clientCancel()
+	h.running = false
 	h.stopChan <- true
 	h.Unlock()
 	h.wg.Wait()
-
-	h.Lock()
-	h.resetWithLock()
-	h.Unlock()
-}
-
-func (h *opHeartbeater) resetWithLock() {
-	h.running = false
-	h.client = nil
-	h.clientCancel = nil
 }
