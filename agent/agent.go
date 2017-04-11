@@ -315,7 +315,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 	o.Lock()
 	defer o.Unlock()
 
-	if o.token != "" && o.token != request.Token && !request.Force {
+	if o.token != "" && o.token != request.SessionToken && !request.Force {
 		return nil, grpc.Errorf(codes.AlreadyExists, "agent already initialized with token: %s", o.token)
 	}
 
@@ -481,7 +481,8 @@ func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
 	)
 	if err != nil {
 		logger.Warnf("unable to send heartbeat: %v", err)
-		// TODO(prateek): do something more here? e.g. shutdown heartbeating or retry or some such
+		// TODO(prateek): we already auto-retry at the next time interval,
+		// do we need to do something more elaborate here?
 	}
 }
 

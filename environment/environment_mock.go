@@ -369,16 +369,6 @@ func (_mr *_MockOptionsRecorder) InstanceOperationTimeout() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationTimeout")
 }
 
-func (_m *MockOptions) InstanceOverride() bool {
-	ret := _m.ctrl.Call(_m, "InstanceOverride")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) InstanceOverride() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOverride")
-}
-
 func (_m *MockOptions) InstrumentOptions() instrument.Options {
 	ret := _m.ctrl.Call(_m, "InstrumentOptions")
 	ret0, _ := ret[0].(instrument.Options)
@@ -397,6 +387,26 @@ func (_m *MockOptions) OperatorOptions() operator.Options {
 
 func (_mr *_MockOptionsRecorder) OperatorOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "OperatorOptions")
+}
+
+func (_m *MockOptions) SessionOverride() bool {
+	ret := _m.ctrl.Call(_m, "SessionOverride")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SessionOverride() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SessionOverride")
+}
+
+func (_m *MockOptions) SessionToken() string {
+	ret := _m.ctrl.Call(_m, "SessionToken")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SessionToken() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SessionToken")
 }
 
 func (_m *MockOptions) SetInstanceOperationRetrier(_param0 retry.Retrier) Options {
@@ -419,16 +429,6 @@ func (_mr *_MockOptionsRecorder) SetInstanceOperationTimeout(arg0 interface{}) *
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationTimeout", arg0)
 }
 
-func (_m *MockOptions) SetInstanceOverride(_param0 bool) Options {
-	ret := _m.ctrl.Call(_m, "SetInstanceOverride", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetInstanceOverride(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOverride", arg0)
-}
-
 func (_m *MockOptions) SetInstrumentOptions(_param0 instrument.Options) Options {
 	ret := _m.ctrl.Call(_m, "SetInstrumentOptions", _param0)
 	ret0, _ := ret[0].(Options)
@@ -449,22 +449,22 @@ func (_mr *_MockOptionsRecorder) SetOperatorOptions(arg0 interface{}) *gomock.Ca
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetOperatorOptions", arg0)
 }
 
-func (_m *MockOptions) SetToken(_param0 string) Options {
-	ret := _m.ctrl.Call(_m, "SetToken", _param0)
+func (_m *MockOptions) SetSessionOverride(_param0 bool) Options {
+	ret := _m.ctrl.Call(_m, "SetSessionOverride", _param0)
 	ret0, _ := ret[0].(Options)
 	return ret0
 }
 
-func (_mr *_MockOptionsRecorder) SetToken(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetToken", arg0)
+func (_mr *_MockOptionsRecorder) SetSessionOverride(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetSessionOverride", arg0)
 }
 
-func (_m *MockOptions) Token() string {
-	ret := _m.ctrl.Call(_m, "Token")
-	ret0, _ := ret[0].(string)
+func (_m *MockOptions) SetSessionToken(_param0 string) Options {
+	ret := _m.ctrl.Call(_m, "SetSessionToken", _param0)
+	ret0, _ := ret[0].(Options)
 	return ret0
 }
 
-func (_mr *_MockOptionsRecorder) Token() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Token")
+func (_mr *_MockOptionsRecorder) SetSessionToken(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetSessionToken", arg0)
 }

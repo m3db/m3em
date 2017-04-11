@@ -31,7 +31,7 @@ import (
 
 const (
 	defaultToken              = ""
-	defaultInstanceOverride   = false
+	defaultSessionOverride    = false
 	defaultInstanceOptTimeout = 90 * time.Second
 )
 
@@ -40,7 +40,7 @@ type opts struct {
 	operatorOpts      operator.Options
 	instanceOpRetrier xretry.Retrier
 	instanceOpTimeout time.Duration
-	instanceOverride  bool
+	sessionOverride   bool
 	token             string
 }
 
@@ -53,7 +53,7 @@ func NewOptions(iopts instrument.Options) Options {
 		iopts:             iopts,
 		instanceOpRetrier: xretry.NewRetrier(xretry.NewOptions()),
 		instanceOpTimeout: defaultInstanceOptTimeout,
-		instanceOverride:  defaultInstanceOverride,
+		sessionOverride:   defaultSessionOverride,
 		token:             defaultToken,
 	}
 }
@@ -94,20 +94,20 @@ func (o opts) OperatorOptions() operator.Options {
 	return o.operatorOpts
 }
 
-func (o opts) SetToken(t string) Options {
+func (o opts) SetSessionToken(t string) Options {
 	o.token = t
 	return o
 }
 
-func (o opts) Token() string {
+func (o opts) SessionToken() string {
 	return o.token
 }
 
-func (o opts) SetInstanceOverride(override bool) Options {
-	o.instanceOverride = override
+func (o opts) SetSessionOverride(override bool) Options {
+	o.sessionOverride = override
 	return o
 }
 
-func (o opts) InstanceOverride() bool {
-	return o.instanceOverride
+func (o opts) SessionOverride() bool {
+	return o.sessionOverride
 }

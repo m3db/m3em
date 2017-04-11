@@ -17,10 +17,9 @@ enum FileType {
   // log file
 }
 
-// TODO(prateek): make heartbeat happen at setup time,
-// pickup state on any pending running operator services
+
 message SetupRequest {
-  string token                    = 1;
+  string session_token            = 1;
   bool   force                    = 2;
   bool   heartbeat_enabled        = 3;
   string heartbeat_endpoint       = 4;

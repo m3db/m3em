@@ -168,17 +168,17 @@ type Options interface {
 	// InstanceOperationRetrier returns the retrier for instance operations
 	InstanceOperationRetrier() xretry.Retrier
 
-	// SetToken sets the token used for interactions with remote m3em agents
-	SetToken(string) Options
+	// SetSessionToken sets the token used for interactions with remote m3em agents
+	SetSessionToken(string) Options
 
-	// Token returns the token used for interactions with remote m3em agents
-	Token() string
+	// SessionToken returns the token used for interactions with remote m3em agents
+	SessionToken() string
 
-	// SetInstanceOverride sets a flag indicating if m3em agent operations
+	// SetSessionOverride sets a flag indicating if m3em agent operations
 	// are permitted to override clashing resources
-	SetInstanceOverride(bool) Options
+	SetSessionOverride(bool) Options
 
-	// InstanceOverride returns a flag indicating if m3em agent operations
+	// SessionOverride returns a flag indicating if m3em agent operations
 	// are permitted to override clashing resources
-	InstanceOverride() bool
+	SessionOverride() bool
 }

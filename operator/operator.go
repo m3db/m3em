@@ -87,7 +87,7 @@ func (o *operator) Setup(
 	err := o.opts.Retrier().Attempt(func() error {
 		ctx := context.Background()
 		_, err := o.client.Setup(ctx, &m3em.SetupRequest{
-			Token:                  token,
+			SessionToken:           token,
 			Force:                  force,
 			HeartbeatEnabled:       o.opts.HeartbeatOptions().Enabled(),
 			HeartbeatEndpoint:      "", // TOOD(prateek): heartbeat endpoint???
@@ -99,6 +99,8 @@ func (o *operator) Setup(
 		return fmt.Errorf("unable to setup: %v", err)
 	}
 
+	// TODO(prateek): make heartbeat happen at setup time,
+	// pickup state on any pending state agent
 	// TODO(prateek): wait till heartbeating starts
 	// if o.opts.HeartbeatOptions().Enabled() { }
 

@@ -174,8 +174,8 @@ func (i *m3dbInst) Setup(b build.ServiceBuild, c build.ServiceConfiguration) err
 		return errUnableToSetupInitializedInstance
 	}
 
-	override := i.opts.InstanceOverride()
-	token := i.opts.Token()
+	override := i.opts.SessionOverride()
+	token := i.opts.SessionToken()
 	i.currentConf = c
 	i.currentBuild = b
 
