@@ -486,10 +486,7 @@ func (h *opHeartbeater) processHeartbeatMsg(msg *m3em.HeartbeatResponse) {
 		h.stop()
 
 	default:
-		err := fmt.Errorf("received unknown heartbeat msg")
-		if msg != nil {
-			err = fmt.Errorf("received unknown heartbeat msg: %v", *msg)
-		}
+		err := fmt.Errorf("received unknown heartbeat msg: %v", *msg)
 		h.listeners.notifyInternalError(err)
 		h.stop()
 	}
