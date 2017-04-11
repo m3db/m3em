@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 	"github.com/m3db/m3em/os/fs"
@@ -61,6 +62,7 @@ type opAgent struct {
 	executablePath string
 	configPath     string
 	processMonitor exec.ProcessMonitor
+	heartbeater    *opAgentHeartBeater
 }
 
 func canaryWriteTest(dir string) error {
@@ -172,10 +174,6 @@ func (o *opAgent) markFileDone(
 	default:
 		o.logger.Warnf("received unknown fileType: %v, filename: %s", fileType, filename)
 	}
-}
-
-func (o *opAgent) Heartbeat(request *m3em.HeartbeatRequest, stream m3em.Operator_HeartbeatServer) error {
-	panic("not implemented")
 }
 
 func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.StartResponse, error) {
@@ -418,6 +416,117 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 				NumChunksRecvd: int32(numChunks),
 			})
 		}
+	}
+}
+
+type opAgentHeartBeater struct {
+	sync.RWMutex
+	agent   *opAgent
+	running bool
+	wg      sync.WaitGroup
+	msgChan chan heartbeatMsg
+	client  hb.HeartbeaterClient
+}
+
+func (h *opAgentHeartBeater) isRunning() bool {
+	h.Lock()
+	running := h.running
+	h.Unlock()
+	return running
+}
+
+func (h *opAgentHeartBeater) start(d time.Duration) {
+	h.Lock()
+	h.running = true
+	h.Unlock()
+	h.wg.Add(1)
+	go h.heartbeatLoop(d)
+}
+
+func (h *opAgentHeartBeater) heartbeatLoop(d time.Duration) {
+	defer h.wg.Done()
+	var (
+		timer     = time.NewTimer(d)
+		heartbeat = true
+	)
+	defer timer.Stop()
+
+	for heartbeat {
+		var resp *hb.HeartbeatRequest
+		select {
+		case msg := <-h.msgChan:
+			if msg.stop {
+				heartbeat = false
+				continue
+			}
+			resp = msg.toRPCType()
+
+		case <-timer.C:
+			resp = &hb.HeartbeatRequest{
+				Code:           hb.HeartbeatCode_HEALTHY,
+				ProcessRunning: h.agent.Running(),
+			}
+		}
+
+		h.sendHeartbeat(resp)
+	}
+}
+
+func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
+	h.Lock()
+	defer h.Unlock()
+	var (
+		logger = h.agent.opts.InstrumentOptions().Logger()
+		_, err = h.client.Heartbeat(context.Background(), r)
+	)
+	if err != nil {
+		logger.Warnf("unable to send heartbeat: %v", err)
+		// TODO(prateek): do something more here? e.g. shutdown heartbeating or retry or some such
+	}
+}
+
+func (h *opAgentHeartBeater) stop() {
+	h.msgChan <- heartbeatMsg{stop: true}
+	h.wg.Wait()
+}
+
+func (h *opAgentHeartBeater) notifyProcessTermination(err error) {
+	h.msgChan <- heartbeatMsg{
+		processTerminate: true,
+		err:              err,
+	}
+}
+
+func (h *opAgentHeartBeater) notifyOverwrite(err error) {
+	h.msgChan <- heartbeatMsg{
+		overwritten: true,
+		err:         err,
+	}
+}
+
+type heartbeatMsg struct {
+	stop             bool
+	processTerminate bool
+	overwritten      bool
+	err              error
+}
+
+func (hm heartbeatMsg) toRPCType() *hb.HeartbeatRequest {
+	if hm.processTerminate {
+		return &hb.HeartbeatRequest{
+			Code:  hb.HeartbeatCode_PROCESS_TERMINATION,
+			Error: hm.err.Error(),
+		}
+	}
+	if hm.overwritten {
+		return &hb.HeartbeatRequest{
+			Code:  hb.HeartbeatCode_OVERWRITTEN,
+			Error: hm.err.Error(),
+		}
+	}
+	// should never happen
+	return &hb.HeartbeatRequest{
+		Code: hb.HeartbeatCode_UNKNOWN,
 	}
 }
 
