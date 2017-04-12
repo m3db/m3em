@@ -83,10 +83,11 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 
 	// create operator to communicate with agent
 	hbOpts := operator.NewHeartbeatOptions().
-		SetEnabled(true)
+		SetEnabled(true).
+		SetHeartbeatRouter(hbRouter)
 	oOpts := operator.NewOptions(iopts).
 		SetHeartbeatOptions(hbOpts)
-	op, err := operator.New(agentListener.Addr().String(), hbRouter, oOpts)
+	op, err := operator.New(agentListener.Addr().String(), oOpts)
 	require.NoError(t, err)
 
 	// capture notifications from operator

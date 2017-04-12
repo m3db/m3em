@@ -1,5 +1,6 @@
 # Build Output
 out/
+test.log
 
 # Glide dependencies
 vendor/

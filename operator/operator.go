@@ -50,7 +50,6 @@ type operator struct {
 // New creates a new operator
 func New(
 	agentEndpoint string,
-	router HeartbeatRouter,
 	opts Options,
 ) (Operator, error) {
 	if err := opts.Validate(); err != nil {
@@ -67,13 +66,16 @@ func New(
 	}
 
 	var (
-		client      = m3em.NewOperatorClient(conn)
-		listeners   = newListenerGroup()
-		hbUUID      = string(uuid[:])
-		heartbeater *opHeartbeatServer
+		client         = m3em.NewOperatorClient(conn)
+		listeners      = newListenerGroup()
+		hbUUID         = string(uuid[:])
+		heartbeater    *opHeartbeatServer
+		routerEndpoint string
 	)
 
 	if opts.HeartbeatOptions().Enabled() {
+		router := opts.HeartbeatOptions().HeartbeatRouter()
+		routerEndpoint = router.Endpoint()
 		heartbeater = newHeartbeater(listeners, opts.HeartbeatOptions(), opts.InstrumentOptions())
 		if err := router.Register(hbUUID, heartbeater); err != nil {
 			return nil, fmt.Errorf("unable to register heartbeat server with router: %v", err)
@@ -88,7 +90,7 @@ func New(
 		opts:              opts,
 		logger:            opts.InstrumentOptions().Logger(),
 		heartbeater:       heartbeater,
-		heartbeatEndpoint: router.Endpoint(),
+		heartbeatEndpoint: routerEndpoint,
 		operatorUUID:      hbUUID,
 	}, nil
 }

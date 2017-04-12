@@ -61,7 +61,7 @@ func (o *options) Validate() error {
 		return fmt.Errorf("TransferBufferSize must be < 4MB")
 	}
 
-	return nil
+	return o.hOpts.Validate()
 }
 
 func (o *options) SetInstrumentOptions(io instrument.Options) Options {

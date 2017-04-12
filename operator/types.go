@@ -66,20 +66,6 @@ type Operator interface {
 	// log directory operations
 }
 
-// HeartbeatRouter routes heartbeats based on registered servers
-type HeartbeatRouter interface {
-	hb.HeartbeaterServer
-
-	// Endpoint returns the router endpoint
-	Endpoint() string
-
-	// Register registers the specified server under the given id
-	Register(string, hb.HeartbeaterServer) error
-
-	// Deregister un-registers any server registered under the given id
-	Deregister(string) error
-}
-
 // ListenerID is a unique identifier for a registered listener
 type ListenerID int
 
@@ -132,8 +118,25 @@ type Options interface {
 	HeartbeatOptions() HeartbeatOptions
 }
 
+// HeartbeatRouter routes heartbeats based on registered servers
+type HeartbeatRouter interface {
+	hb.HeartbeaterServer
+
+	// Endpoint returns the router endpoint
+	Endpoint() string
+
+	// Register registers the specified server under the given id
+	Register(string, hb.HeartbeaterServer) error
+
+	// Deregister un-registers any server registered under the given id
+	Deregister(string) error
+}
+
 // HeartbeatOptions are the knobs to control heartbeating behavior
 type HeartbeatOptions interface {
+	// Validate validates the HeartbeatOptions
+	Validate() error
+
 	// SetEnabled sets whether the Heartbeating is enabled
 	SetEnabled(bool) HeartbeatOptions
 
@@ -167,6 +170,12 @@ type HeartbeatOptions interface {
 	// Timeout returns the heartbeat timeout duration, i.e. the window of
 	// time after which missing heartbeats are considered errorneous
 	Timeout() time.Duration
+
+	// SetHeartbeatRouter sets the heartbeat router to be used
+	SetHeartbeatRouter(HeartbeatRouter) HeartbeatOptions
+
+	// HeartbeatRouter returns the heartbeat router in use
+	HeartbeatRouter() HeartbeatRouter
 }
 
 // NowFn returns the current time

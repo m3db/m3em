@@ -33,7 +33,6 @@ import (
 
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
-	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/operator"
 
@@ -50,15 +49,9 @@ func TestProccessStreamingOutputExecution(t *testing.T) {
 	defer os.RemoveAll(targetLocation)
 
 	iopts := instrument.NewOptions()
-	// create agent listener, get free port from OS
-	agentListener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer agentListener.Close()
-
-	// create heartbeat listener, get free port from OS
-	heartbeatListener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer heartbeatListener.Close()
+	// create listener, get free port from OS
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	defer l.Close()
 
 	// create operator agent
 	aOpts := agent.NewOptions(iopts).SetWorkingDirectory(targetLocation)
@@ -67,22 +60,13 @@ func TestProccessStreamingOutputExecution(t *testing.T) {
 	require.NoError(t, err)
 	m3em.RegisterOperatorServer(server, agentService)
 	go func() {
-		server.Serve(agentListener)
+		server.Serve(l)
 	}()
 	defer server.GracefulStop()
 
-	// create new heartbeat router
-	hbRouter := operator.NewHeartbeatRouter(heartbeatListener.Addr().String())
-	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
-	hb.RegisterHeartbeaterServer(hbServer, hbRouter)
-	go func() {
-		hbServer.Serve(heartbeatListener)
-	}()
-	defer hbServer.GracefulStop()
-
 	// create operator to communicate with agent
 	oOpts := operator.NewOptions(iopts)
-	op, err := operator.New(agentListener.Addr().String(), hbRouter, oOpts)
+	op, err := operator.New(l.Addr().String(), oOpts)
 	require.NoError(t, err)
 
 	// create test build

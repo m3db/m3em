@@ -21,6 +21,7 @@
 package operator
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -38,6 +39,7 @@ type heartbeatOpts struct {
 	interval      time.Duration
 	checkInterval time.Duration
 	timeout       time.Duration
+	router        HeartbeatRouter
 }
 
 // NewHeartbeatOptions returns the default HeartbeatOptions
@@ -49,6 +51,13 @@ func NewHeartbeatOptions() HeartbeatOptions {
 		checkInterval: defaultCheckInterval,
 		timeout:       defaultHeartbeatTimeout,
 	}
+}
+
+func (ho *heartbeatOpts) Validate() error {
+	if ho.enabled && ho.router == nil {
+		return fmt.Errorf("HeartbeatRouter not set")
+	}
+	return nil
 }
 
 func (ho *heartbeatOpts) SetEnabled(f bool) HeartbeatOptions {
@@ -94,4 +103,13 @@ func (ho *heartbeatOpts) SetTimeout(d time.Duration) HeartbeatOptions {
 
 func (ho *heartbeatOpts) Timeout() time.Duration {
 	return ho.timeout
+}
+
+func (ho *heartbeatOpts) SetHeartbeatRouter(r HeartbeatRouter) HeartbeatOptions {
+	ho.router = r
+	return ho
+}
+
+func (ho *heartbeatOpts) HeartbeatRouter() HeartbeatRouter {
+	return ho.router
 }
