@@ -69,12 +69,15 @@ func New(
 	var (
 		client      = m3em.NewOperatorClient(conn)
 		listeners   = newListenerGroup()
-		heartbeater = newHeartbeater(listeners, opts.HeartbeatOptions(), opts.InstrumentOptions())
+		hbUUID      = string(uuid[:])
+		heartbeater *opHeartbeatServer
 	)
 
-	hbUUID := string(uuid[:])
-	if err := router.Register(hbUUID, heartbeater); err != nil {
-		return nil, err
+	if opts.HeartbeatOptions().Enabled() {
+		heartbeater = newHeartbeater(listeners, opts.HeartbeatOptions(), opts.InstrumentOptions())
+		if err := router.Register(hbUUID, heartbeater); err != nil {
+			return nil, fmt.Errorf("unable to register heartbeat server with router: %v", err)
+		}
 	}
 
 	return &operator{
