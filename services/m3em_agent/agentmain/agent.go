@@ -31,7 +31,7 @@ import (
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 	m3emconfig "github.com/m3db/m3em/services/m3em_agent/config"
-	"github.com/m3db/m3em/services/m3em_agent/tcp"
+	"github.com/m3db/m3em/tcp"
 
 	"github.com/m3db/m3x/instrument"
 	xlog "github.com/m3db/m3x/log"

@@ -194,8 +194,8 @@ func (i *m3dbInst) OverrideConfiguration(conf build.ServiceConfiguration) error 
 		return errUnableToOverrideConf
 	}
 	i.currentConf = conf
-	// TODO(prateek): implement operator operations for this path
-	return nil
+	panic("not implemented") // TODO(prateek): implement operator operations for this path
+	// return nil
 }
 
 func (i *m3dbInst) Reset() error {
