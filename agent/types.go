@@ -33,7 +33,6 @@ type Agent interface {
 
 	// Running returns a flag indicating if the test process supervised
 	// by the Agent is running.
-	// TODO(prateek): currently only used in integration tests, could we get rid of it once we have heartbeating?
 	Running() bool
 }
 

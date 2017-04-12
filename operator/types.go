@@ -60,7 +60,7 @@ type Operator interface {
 	// DeregisterListener un-registers an event listener
 	DeregisterListener(ListenerID)
 
-	// TODO(prateek): operator opts
+	// TODO(prateek): add operator operations for -
 	// CleanDataDirectory() error
 	// ListDataDirectory(recursive bool, includeContents bool) ([]DirEntry, error)
 	// log directory operations

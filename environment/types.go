@@ -111,7 +111,7 @@ type M3DBInstance interface {
 	// Health returns the health for this ServiceInstance
 	Health() (M3DBInstanceHealth, error)
 
-	// TODO(prateek):
+	// TODO(prateek): add more m3db service endpoints in M3DBInstance
 	// - query service observable properties (nowFn, detailed_status)
 	// - set nowFn offset
 	// - logs
