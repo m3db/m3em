@@ -1,5 +1,5 @@
-hash: b15492adf10f0e76c2b6cab8fd1f316409987fc5da29c2e5b287dcfb26dc0eae
-updated: 2017-03-31T15:47:01.011128251-04:00
+hash: aed93333b2fddd708fcc1eb4e48738b6c04b3acc1ae683e0a6f0dae4f078e127
+updated: 2017-04-12T13:28:39.650872077-04:00
 imports:
 - name: github.com/apache/thrift
   version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
@@ -79,6 +79,8 @@ imports:
   version: b3b15ef068fd0b17ddf408a23669f20811d194d2
 - name: github.com/mitchellh/mapstructure
   version: 53818660ed4955e899c0bcafa97299a388bd7c8e
+- name: github.com/nu7hatch/gouuid
+  version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
 - name: github.com/opentracing/opentracing-go
   version: 855519783f479520497c6b3445611b05fc42f009
   subpackages:

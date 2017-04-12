@@ -17,13 +17,13 @@ enum FileType {
   // log file
 }
 
-
 message SetupRequest {
   string session_token            = 1;
-  bool   force                    = 2;
-  bool   heartbeat_enabled        = 3;
-  string heartbeat_endpoint       = 4;
-  uint32 heartbeat_frequency_secs = 5;
+  string operator_uuid            = 2;
+  bool   force                    = 3;
+  bool   heartbeat_enabled        = 4;
+  string heartbeat_endpoint       = 5;
+  uint32 heartbeat_frequency_secs = 6;
 }
 
 message SetupResponse {

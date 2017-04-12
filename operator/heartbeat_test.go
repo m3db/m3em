@@ -21,16 +21,19 @@
 package operator
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 
-	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
+	context "golang.org/x/net/context"
+)
+
+var (
+	testEndpoint = "a.b.c.d:12345"
 )
 
 func newTestHeartbeatOpts() HeartbeatOptions {
@@ -49,9 +52,6 @@ func newTestListener(t *testing.T) *listener {
 }
 
 func TestHeartbeaterSimple(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
 		lg       = newListenerGroup()
 		opts     = newTestHeartbeatOpts()
@@ -70,9 +70,6 @@ func TestHeartbeaterSimple(t *testing.T) {
 }
 
 func TestHeartbeatingUnknownCode(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
 		lg       = newListenerGroup()
 		opts     = newTestHeartbeatOpts()
@@ -92,9 +89,6 @@ func TestHeartbeatingUnknownCode(t *testing.T) {
 }
 
 func TestHeartbeatingProcessTermination(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
 		lg    = newListenerGroup()
 		opts  = newTestHeartbeatOpts()
@@ -129,9 +123,6 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 }
 
 func TestHeartbeatingOverwrite(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
 		lg    = newListenerGroup()
 		opts  = newTestHeartbeatOpts()
@@ -166,9 +157,6 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 }
 
 func TestHeartbeatingTimeout(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
 		now       = time.Now()
 		callCount = 0
@@ -209,4 +197,86 @@ func TestHeartbeatingTimeout(t *testing.T) {
 	lock.Lock()
 	defer lock.Unlock()
 	require.True(t, timedout)
+}
+
+func TestHeartbeatRouterValidRoute(t *testing.T) {
+	var (
+		lg     = newListenerGroup()
+		opts   = newTestHeartbeatOpts()
+		iopts  = instrument.NewOptions()
+		router = NewHeartbeatRouter(testEndpoint)
+	)
+	require.Equal(t, testEndpoint, router.Endpoint())
+
+	var (
+		lock        sync.Mutex
+		overwritten = false
+		lnr         = newTestListener(t)
+	)
+	lnr.onOverwrite = func(string) {
+		lock.Lock()
+		overwritten = true
+		lock.Unlock()
+	}
+	lg.add(lnr)
+	hbServer := newHeartbeater(lg, opts, iopts)
+	require.NoError(t, hbServer.start())
+
+	testUUID := "123456789"
+	require.NoError(t, router.Register(testUUID, hbServer))
+	require.Error(t, router.Register(testUUID, nil))
+
+	_, err := router.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			OperatorUuid: testUUID,
+			Code:         hb.HeartbeatCode_OVERWRITTEN,
+		})
+	require.NoError(t, err)
+	time.Sleep(10 * time.Millisecond) // to yield to any pending go routines
+	hbServer.stop()
+
+	lock.Lock()
+	defer lock.Unlock()
+	require.True(t, overwritten)
+}
+
+func TestHeartbeatRouterDeregister(t *testing.T) {
+	var (
+		lg     = newListenerGroup()
+		opts   = newTestHeartbeatOpts()
+		iopts  = instrument.NewOptions()
+		router = NewHeartbeatRouter(testEndpoint)
+	)
+	require.Equal(t, testEndpoint, router.Endpoint())
+	hbServer := newHeartbeater(lg, opts, iopts)
+	testUUID := "123456789"
+
+	require.NoError(t, router.Register(testUUID, hbServer))
+	_, err := router.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			OperatorUuid: string(testUUID),
+			Code:         hb.HeartbeatCode_OVERWRITTEN,
+		})
+	require.NoError(t, err)
+
+	require.NoError(t, router.Deregister(testUUID))
+	_, err = router.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			OperatorUuid: string(testUUID),
+			Code:         hb.HeartbeatCode_OVERWRITTEN,
+		})
+	require.Error(t, err)
+}
+
+func TestHeartbeatRouterInvalidRoute(t *testing.T) {
+	var (
+		router   = NewHeartbeatRouter(testEndpoint)
+		testUUID = "123456789"
+	)
+	_, err := router.Heartbeat(context.Background(),
+		&hb.HeartbeatRequest{
+			OperatorUuid: testUUID,
+			Code:         hb.HeartbeatCode_OVERWRITTEN,
+		})
+	require.Error(t, err)
 }

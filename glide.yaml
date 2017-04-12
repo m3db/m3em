@@ -53,3 +53,5 @@ import:
   - codes
 - package: gopkg.in/validator.v2
   version: 3e4f037f12a1221a0864cf0dd2e81c452ab22448
+- package: github.com/nu7hatch/gouuid
+  version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3

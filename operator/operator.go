@@ -31,28 +31,37 @@ import (
 	"github.com/m3db/m3em/os/fs"
 
 	"github.com/m3db/m3x/log"
+	gu "github.com/nu7hatch/gouuid"
 	"google.golang.org/grpc"
 )
 
 type operator struct {
-	endpoint    string
-	clientConn  *grpc.ClientConn
-	client      m3em.OperatorClient
-	opts        Options
-	logger      xlog.Logger
-	listeners   *listenerGroup
-	heartbeater *opHeartbeatServer
+	endpoint          string
+	clientConn        *grpc.ClientConn
+	client            m3em.OperatorClient
+	opts              Options
+	logger            xlog.Logger
+	listeners         *listenerGroup
+	heartbeater       *opHeartbeatServer
+	operatorUUID      string
+	heartbeatEndpoint string
 }
 
 // New creates a new operator
 func New(
-	endpoint string,
+	agentEndpoint string,
+	router HeartbeatRouter,
 	opts Options,
 ) (Operator, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	conn, err := grpc.Dial(endpoint, grpc.WithTimeout(opts.Timeout()), grpc.WithInsecure())
+	conn, err := grpc.Dial(agentEndpoint, grpc.WithTimeout(opts.Timeout()), grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	uuid, err := gu.NewV4()
 	if err != nil {
 		return nil, err
 	}
@@ -63,14 +72,21 @@ func New(
 		heartbeater = newHeartbeater(listeners, opts.HeartbeatOptions(), opts.InstrumentOptions())
 	)
 
+	hbUUID := string(uuid[:])
+	if err := router.Register(hbUUID, heartbeater); err != nil {
+		return nil, err
+	}
+
 	return &operator{
-		endpoint:    endpoint,
-		listeners:   listeners,
-		client:      client,
-		clientConn:  conn,
-		opts:        opts,
-		logger:      opts.InstrumentOptions().Logger(),
-		heartbeater: heartbeater,
+		endpoint:          agentEndpoint,
+		listeners:         listeners,
+		client:            client,
+		clientConn:        conn,
+		opts:              opts,
+		logger:            opts.InstrumentOptions().Logger(),
+		heartbeater:       heartbeater,
+		heartbeatEndpoint: router.Endpoint(),
+		operatorUUID:      hbUUID,
 	}, nil
 }
 
@@ -84,10 +100,11 @@ func (o *operator) Setup(
 	err := o.opts.Retrier().Attempt(func() error {
 		ctx := context.Background()
 		_, err := o.client.Setup(ctx, &m3em.SetupRequest{
+			OperatorUuid:           o.operatorUUID,
 			SessionToken:           token,
 			Force:                  force,
 			HeartbeatEnabled:       o.opts.HeartbeatOptions().Enabled(),
-			HeartbeatEndpoint:      "", // TOOD(prateek): heartbeat endpoint???
+			HeartbeatEndpoint:      o.heartbeatEndpoint,
 			HeartbeatFrequencySecs: freq,
 		})
 		return err
@@ -96,10 +113,22 @@ func (o *operator) Setup(
 		return fmt.Errorf("unable to setup: %v", err)
 	}
 
-	// TODO(prateek): make heartbeat happen at setup time,
-	// pickup state on any pending state agent
-	// TODO(prateek): wait till heartbeating starts
-	// if o.opts.HeartbeatOptions().Enabled() { }
+	// TODO(prateek): make heartbeat pickup existing agent state
+
+	// Wait till we receive our first heartbeat
+	if o.opts.HeartbeatOptions().Enabled() {
+		o.logger.Infof("waiting until initial heartbeat is recieved")
+		received := waitUntil(o.heartbeatReceived, o.opts.HeartbeatOptions().Timeout())
+		if !received {
+			return fmt.Errorf("did not receive heartbeat response from remote agent within timeout")
+		}
+		o.logger.Infof("initial heartbeat recieved")
+
+		// start hb monitoring
+		if err := o.heartbeater.start(); err != nil {
+			return fmt.Errorf("unable to start heartbeat monitor loop: %v", err)
+		}
+	}
 
 	if err := o.sendBuild(bld, force); err != nil {
 		return fmt.Errorf("unable to transfer build: %v", err)
@@ -110,6 +139,23 @@ func (o *operator) Setup(
 	}
 
 	return nil
+}
+
+func (o *operator) heartbeatReceived() bool {
+	return !o.heartbeater.lastHeartbeatTime().IsZero()
+}
+
+type conditionFn func() bool
+
+func waitUntil(fn conditionFn, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return true
+		}
+		time.Sleep(time.Second)
+	}
+	return false
 }
 
 func (o *operator) sendBuild(

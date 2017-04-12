@@ -1,7 +1,6 @@
 package operator
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -9,9 +8,76 @@ import (
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 
 	"github.com/m3db/m3x/instrument"
+	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
+
+type heartbeatRouter struct {
+	sync.RWMutex
+	endpoint string
+	servers  map[string]hb.HeartbeaterServer
+}
+
+// NewHeartbeatRouter returns a new heartbeat router
+func NewHeartbeatRouter(endpoint string) HeartbeatRouter {
+	return &heartbeatRouter{
+		endpoint: endpoint,
+		servers:  make(map[string]hb.HeartbeaterServer),
+	}
+}
+
+func (hr *heartbeatRouter) Endpoint() string {
+	hr.RLock()
+	defer hr.RUnlock()
+	return hr.endpoint
+}
+
+func (hr *heartbeatRouter) Register(id string, server hb.HeartbeaterServer) error {
+	hr.Lock()
+	defer hr.Unlock()
+
+	if _, ok := hr.servers[id]; ok {
+		return fmt.Errorf("uuid is already registered: %s", id)
+	}
+
+	hr.servers[id] = server
+	return nil
+}
+
+func (hr *heartbeatRouter) Deregister(id string) error {
+	hr.Lock()
+	defer hr.Unlock()
+
+	if _, ok := hr.servers[id]; !ok {
+		return fmt.Errorf("unknown uuid: %s", id)
+	}
+
+	delete(hr.servers, id)
+	return nil
+}
+
+func (hr *heartbeatRouter) Heartbeat(
+	ctx context.Context,
+	msg *hb.HeartbeatRequest,
+) (*hb.HeartbeatResponse, error) {
+	if msg == nil {
+		return nil, grpc.Errorf(codes.InvalidArgument, "received nil heartbeat msg")
+	}
+
+	if msg.OperatorUuid == "" {
+		return nil, grpc.Errorf(codes.InvalidArgument, "received heartbeat msg without operator uuid: %+v", *msg)
+	}
+
+	hr.RLock()
+	defer hr.RUnlock()
+	server, ok := hr.servers[msg.OperatorUuid]
+	if !ok {
+		return nil, grpc.Errorf(codes.InvalidArgument, "received heartbeat msg contains un-registered operator uuid: %+v", *msg)
+	}
+
+	return server.Heartbeat(ctx, msg)
+}
 
 // Heartbeating from agent -> operator: this is to ensure capture of asynchronous
 // error conditions, e.g. the child process kicked off by the agent dies, but the

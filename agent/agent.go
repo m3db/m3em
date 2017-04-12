@@ -36,6 +36,7 @@ import (
 	"github.com/m3db/m3em/os/fs"
 
 	xerrors "github.com/m3db/m3x/errors"
+	"github.com/m3db/m3x/instrument"
 	xlog "github.com/m3db/m3x/log"
 	"github.com/uber-go/tally"
 	context "golang.org/x/net/context"
@@ -44,8 +45,9 @@ import (
 )
 
 var (
-	defaultReportInterval   = time.Duration(5 * time.Second)
-	defaultTestCanaryPrefix = "test-canary-file"
+	defaultReportInterval       = time.Duration(5 * time.Second)
+	defaultTestCanaryPrefix     = "test-canary-file"
+	defaultHeartbeatConnTimeout = time.Duration(1 * time.Minute)
 )
 
 var (
@@ -203,14 +205,22 @@ func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.
 func (o *opAgent) newProcessListener() exec.ProcessListener {
 	onComplete := func() {
 		o.Lock()
-		o.logger.Warnf("test process terminated without error")
+		err := fmt.Errorf("test process terminated without error")
+		o.logger.Warnf("%v", err)
 		o.running = false
+		if o.heartbeater != nil {
+			o.heartbeater.notifyProcessTermination(err)
+		}
 		o.Unlock()
 	}
 	onError := func(err error) {
 		o.Lock()
-		o.logger.Warnf("test process terminated with error: %v", err)
+		newErr := fmt.Errorf("test process terminated with error: %v", err)
+		o.logger.Warnf("%v", newErr)
 		o.running = false
+		if o.heartbeater != nil {
+			o.heartbeater.notifyProcessTermination(err)
+		}
 		o.Unlock()
 	}
 	return exec.NewProcessListener(onComplete, onError)
@@ -288,7 +298,9 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	}
 
 	// remove any temporary resources stored in the working directory
-	err := fs.RemoveContents(o.opts.WorkingDirectory())
+	wd := o.opts.WorkingDirectory()
+	o.logger.Infof("removing contents from working directory: %s", wd)
+	err := fs.RemoveContents(wd)
 	multiErr = multiErr.Add(err)
 
 	o.logger.Infof("releasing host resources")
@@ -297,14 +309,21 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 		multiErr = multiErr.Add(err)
 	}
 
-	if finalErr := multiErr.FinalError(); finalErr != nil {
-		return nil, grpc.Errorf(codes.Internal, "unable to teardown: %v", finalErr)
+	o.logger.Infof("stopping heartbeating")
+	if o.heartbeater != nil {
+		multiErr = multiErr.Add(o.heartbeater.close())
 	}
 
 	o.token = ""
 	o.executablePath = ""
 	o.configPath = ""
 	o.running = false
+	o.heartbeater = nil
+
+	if finalErr := multiErr.FinalError(); finalErr != nil {
+		return nil, grpc.Errorf(codes.Internal, "unable to teardown: %v", finalErr)
+	}
+
 	return &m3em.TeardownResponse{}, nil
 }
 
@@ -317,6 +336,12 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 	if o.token != "" && o.token != request.SessionToken && !request.Force {
 		return nil, grpc.Errorf(codes.AlreadyExists, "agent already initialized with token: %s", o.token)
+	}
+
+	// stop existing heartbeating if any
+	if o.heartbeater != nil {
+		o.heartbeater.notifyOverwrite(fmt.Errorf("heartbeating being overwritten by new setup request: %+v", *request))
+		o.heartbeater = nil
 	}
 
 	if o.running {
@@ -341,6 +366,16 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 	if err := o.opts.InitHostResourcesFn()(); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "unable to initialize host resources: %v", err)
+	}
+
+	// setup new heartbeating
+	if request.HeartbeatEnabled {
+		beater, err := newHeartbeater(o, request.OperatorUuid, request.HeartbeatEndpoint, o.opts.InstrumentOptions())
+		if err != nil {
+			return nil, grpc.Errorf(codes.Aborted, "unable to start heartbeating process: %v", err)
+		}
+		o.heartbeater = beater
+		o.heartbeater.start(time.Second * time.Duration(request.HeartbeatFrequencySecs))
 	}
 
 	return &m3em.SetupResponse{}, nil
@@ -421,18 +456,54 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 
 type opAgentHeartBeater struct {
 	sync.RWMutex
-	agent   *opAgent
-	running bool
-	wg      sync.WaitGroup
-	msgChan chan heartbeatMsg
-	client  hb.HeartbeaterClient
+	iopts             instrument.Options
+	agent             *opAgent
+	running           bool
+	wg                sync.WaitGroup
+	msgChan           chan heartbeatMsg
+	conn              *grpc.ClientConn
+	client            hb.HeartbeaterClient
+	operatorUUID      string
+	heartbeatEndpoint string
+}
+
+func newHeartbeater(
+	agent *opAgent,
+	opUUID string,
+	hbEndpoint string,
+	iopts instrument.Options,
+) (*opAgentHeartBeater, error) {
+	conn, err := grpc.Dial(hbEndpoint, grpc.WithTimeout(defaultHeartbeatConnTimeout), grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	client := hb.NewHeartbeaterClient(conn)
+	return &opAgentHeartBeater{
+		iopts:             iopts,
+		agent:             agent,
+		msgChan:           make(chan heartbeatMsg),
+		conn:              conn,
+		client:            client,
+		operatorUUID:      opUUID,
+		heartbeatEndpoint: hbEndpoint,
+	}, nil
 }
 
 func (h *opAgentHeartBeater) isRunning() bool {
-	h.Lock()
+	h.RLock()
 	running := h.running
-	h.Unlock()
+	h.RUnlock()
 	return running
+}
+
+func (h *opAgentHeartBeater) defaultHeartbeat() hb.HeartbeatRequest {
+	h.RLock()
+	req := hb.HeartbeatRequest{
+		OperatorUuid:   h.operatorUUID,
+		ProcessRunning: h.agent.Running(),
+	}
+	h.RUnlock()
+	return req
 }
 
 func (h *opAgentHeartBeater) start(d time.Duration) {
@@ -443,8 +514,23 @@ func (h *opAgentHeartBeater) start(d time.Duration) {
 	go h.heartbeatLoop(d)
 }
 
+func (h *opAgentHeartBeater) sendHealthyHeartbeat() {
+	beat := h.defaultHeartbeat()
+	beat.Code = hb.HeartbeatCode_HEALTHY
+	h.sendHeartbeat(&beat)
+}
+
 func (h *opAgentHeartBeater) heartbeatLoop(d time.Duration) {
 	defer h.wg.Done()
+	defer func() {
+		h.Lock()
+		h.running = false
+		h.Unlock()
+	}()
+
+	// explicitly send first heartbeat as soon as we start
+	h.sendHealthyHeartbeat()
+
 	var (
 		timer     = time.NewTimer(d)
 		heartbeat = true
@@ -452,23 +538,19 @@ func (h *opAgentHeartBeater) heartbeatLoop(d time.Duration) {
 	defer timer.Stop()
 
 	for heartbeat {
-		var resp *hb.HeartbeatRequest
 		select {
 		case msg := <-h.msgChan:
 			if msg.stop {
 				heartbeat = false
 				continue
 			}
-			resp = msg.toRPCType()
+			beat := h.defaultHeartbeat()
+			msg.toRPCType(&beat)
+			h.sendHeartbeat(&beat)
 
 		case <-timer.C:
-			resp = &hb.HeartbeatRequest{
-				Code:           hb.HeartbeatCode_HEALTHY,
-				ProcessRunning: h.agent.Running(),
-			}
+			h.sendHealthyHeartbeat()
 		}
-
-		h.sendHeartbeat(resp)
 	}
 }
 
@@ -476,7 +558,7 @@ func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
 	h.Lock()
 	defer h.Unlock()
 	var (
-		logger = h.agent.opts.InstrumentOptions().Logger()
+		logger = h.iopts.Logger()
 		_, err = h.client.Heartbeat(context.Background(), r)
 	)
 	if err != nil {
@@ -487,8 +569,20 @@ func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
 }
 
 func (h *opAgentHeartBeater) stop() {
-	h.msgChan <- heartbeatMsg{stop: true}
-	h.wg.Wait()
+	if h.isRunning() {
+		h.msgChan <- heartbeatMsg{stop: true}
+		h.wg.Wait()
+	}
+}
+
+func (h *opAgentHeartBeater) close() error {
+	h.stop()
+	var err error
+	if h.conn != nil {
+		err = h.conn.Close()
+		h.conn = nil
+	}
+	return err
 }
 
 func (h *opAgentHeartBeater) notifyProcessTermination(err error) {
@@ -512,22 +606,16 @@ type heartbeatMsg struct {
 	err              error
 }
 
-func (hm heartbeatMsg) toRPCType() *hb.HeartbeatRequest {
+func (hm heartbeatMsg) toRPCType(req *hb.HeartbeatRequest) {
 	if hm.processTerminate {
-		return &hb.HeartbeatRequest{
-			Code:  hb.HeartbeatCode_PROCESS_TERMINATION,
-			Error: hm.err.Error(),
-		}
-	}
-	if hm.overwritten {
-		return &hb.HeartbeatRequest{
-			Code:  hb.HeartbeatCode_OVERWRITTEN,
-			Error: hm.err.Error(),
-		}
-	}
-	// should never happen
-	return &hb.HeartbeatRequest{
-		Code: hb.HeartbeatCode_UNKNOWN,
+		req.Code = hb.HeartbeatCode_PROCESS_TERMINATION
+		req.Error = hm.err.Error()
+	} else if hm.overwritten {
+		req.Code = hb.HeartbeatCode_OVERWRITTEN
+		req.Error = hm.err.Error()
+	} else {
+		// should never happen
+		req.Code = hb.HeartbeatCode_UNKNOWN
 	}
 }
 

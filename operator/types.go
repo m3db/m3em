@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/m3db/m3em/build"
+	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 
 	"github.com/m3db/m3x/instrument"
 	xretry "github.com/m3db/m3x/retry"
@@ -63,6 +64,20 @@ type Operator interface {
 	// CleanDataDirectory() error
 	// ListDataDirectory(recursive bool, includeContents bool) ([]DirEntry, error)
 	// log directory operations
+}
+
+// HeartbeatRouter routes heartbeats based on registered servers
+type HeartbeatRouter interface {
+	hb.HeartbeaterServer
+
+	// Endpoint returns the router endpoint
+	Endpoint() string
+
+	// Register registers the specified server under the given id
+	Register(string, hb.HeartbeaterServer) error
+
+	// Deregister un-registers any server registered under the given id
+	Deregister(string) error
 }
 
 // ListenerID is a unique identifier for a registered listener

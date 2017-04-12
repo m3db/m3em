@@ -20,18 +20,15 @@
 
 // mockgen rules for generating mocks for unexported interfaces (file mode)
 //go:generate sh -c "mockgen -package=build -destination=$GOPATH/src/$PACKAGE/build/build_mock.go -source=$GOPATH/src/$PACKAGE/build/types.go"
-//go:generate sh -c "mockgen -package=operator -destination=$GOPATH/src/$PACKAGE/operator/operator_mock.go -source=$GOPATH/src/$PACKAGE/operator/types.go"
 //go:generate sh -c "mockgen -package=cluster -destination=$GOPATH/src/$PACKAGE/cluster/cluster_mock.go -source=$GOPATH/src/$PACKAGE/cluster/types.go"
 
-// mockgen rules for generating mocks for exported interfaces (reflection mode)
-// TBH reflection mode is sketch af.
-// (1) proto-gened package (heartbeat) mocks
-//go:generate sh -c "mockgen -package=heartbeat -destination=$GOPATH/src/$PACKAGE/generated/proto/heartbeat/mock_heartbeat.pb.go github.com/m3db/m3em/generated/proto/heartbeat HeartbeaterClient,HeartbeaterServer"
-//- delete the vendor prefix due to https://github.com/golang/mock/issues/30
-//go:generate sed -i "" s@github.com/m3db/m3em/vendor/@@g $GOPATH/src/$PACKAGE/generated/proto/heartbeat/mock_heartbeat.pb.go
+// mockgen rules for generating mocks for exported interfaces (reflection mode). TBH this mode is sketch af.
+// (1) operator package mocks
+//go:generate sh -c "mockgen -package=operator -destination=$GOPATH/src/$PACKAGE/operator/operator_mock.go github.com/m3db/m3em/operator Operator"
 //- mockgen creates a circluar chain by importing the package within itself
-//go:generate sed -i "" -e s@heartbeat\.@@g $GOPATH/src/$PACKAGE/generated/proto/heartbeat/mock_heartbeat.pb.go
-//go:generate sed -i "" s@.*heartbeat.*github.com.*@@g $GOPATH/src/$PACKAGE/generated/proto/heartbeat/mock_heartbeat.pb.go
+//go:generate sed -i "" -e s@operator\.@@g $GOPATH/src/$PACKAGE/operator/operator_mock.go
+//go:generate sed -i "" s@.*operator.*github.com.*@@g $GOPATH/src/$PACKAGE/operator/operator_mock.go
+
 // (2) environment package mocks
 //go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/environment_mock.go github.com/m3db/m3em/environment M3DBInstance,M3DBEnvironment,Options"
 //- delete the vendor prefix due to https://github.com/golang/mock/issues/30

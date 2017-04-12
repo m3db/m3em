@@ -28,6 +28,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func TestProcessExecution(t *testing.T) {
+func TestProcessExecutionHeartbeating(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -81,9 +82,34 @@ func TestProcessExecution(t *testing.T) {
 	defer hbServer.GracefulStop()
 
 	// create operator to communicate with agent
-	oOpts := operator.NewOptions(iopts)
+	hbOpts := operator.NewHeartbeatOptions().
+		SetEnabled(true)
+	oOpts := operator.NewOptions(iopts).
+		SetHeartbeatOptions(hbOpts)
 	op, err := operator.New(agentListener.Addr().String(), hbRouter, oOpts)
 	require.NoError(t, err)
+
+	// capture notifications from operator
+	var (
+		lock                sync.Mutex
+		notifiedTermination = false
+	)
+	operatorEventListener := operator.NewListener(
+		func(s string) {
+			require.False(t, notifiedTermination)
+			lock.Lock()
+			notifiedTermination = true
+			lock.Unlock()
+		},
+		func(ts time.Time) {
+			require.FailNow(t, "received timeout: %v", ts.String())
+		},
+		func(s string) {
+			require.FailNow(t, "received overwrite: %v", s)
+		},
+	)
+	id := op.RegisterListener(operatorEventListener)
+	defer op.DeregisterListener(id)
 
 	// create test build
 	scriptContents := []byte(`#!/usr/bin/env bash
@@ -110,6 +136,10 @@ echo -ne "testing random output"`)
 	require.NoError(t, op.Start())
 	stopped := waitUntilAgentFinished(agentService, time.Second)
 	require.True(t, stopped)
+
+	// ensure we were notified of exit at the operator level
+	require.True(t, notifiedTermination)
+	iopts.Logger().Infof("received termination heartbeat in operator")
 
 	stderrFile := path.Join(targetLocation, fmt.Sprintf("%s.err", testBuildID))
 	stderrContents, err := ioutil.ReadFile(stderrFile)

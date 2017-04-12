@@ -7,12 +7,14 @@ service Heartbeater {
 }
 
 message HeartbeatRequest {
-  HeartbeatCode code            = 1;
-  string        error           = 2;
-  bool          processRunning  = 3;
-  string        token           = 4;
-  uint32        config_checksum = 5;
-  uint32        binary_checksum = 6;
+  string        operator_uuid    = 1;
+  HeartbeatCode code             = 2;
+  string        error            = 3;
+  bool          process_running  = 4;
+	// TODO(prateek): need the fields below for resuming state
+  // string        session_token    = 5;
+  // uint32        config_checksum  = 6;
+  // uint32        binary_checksum  = 7;
 }
 
 enum HeartbeatCode {
