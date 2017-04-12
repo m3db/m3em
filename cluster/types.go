@@ -135,15 +135,15 @@ type Cluster interface {
 	Status() Status
 
 	// Client returns a m3db Client object
-	Client() m3dbc.Client
-
+	// Client() m3dbc.Client
 	// Client returns a m3db AdminClient object
-	AdminClient() m3dbc.AdminClient
+	// AdminClient() m3dbc.AdminClient
 }
 
 // Options represents the options to configure a `Cluster`
 type Options interface {
-	// TODO(prateek): this needs a Validate() error
+	// Validate validates the Options
+	Validate() error
 
 	// SetInstrumentOptions sets the instrumentation options
 	SetInstrumentOptions(instrument.Options) Options

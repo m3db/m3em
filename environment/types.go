@@ -118,6 +118,20 @@ type M3DBInstance interface {
 	// - metrics
 }
 
+// M3DBInstanceListener provides callbacks to be notified of events on the
+// remote instance
+type M3DBInstanceListener interface {
+	// OnProcessTerminate is invoked when the remote process being run terminates
+	OnProcessTerminate(inst M3DBInstance, desc string)
+
+	// OnHeartbeatTimeout is invoked upon remote heartbeats having timed-out
+	OnHeartbeatTimeout(inst M3DBInstance, lastHeartbeatTs time.Time)
+
+	// OnOverwrite is invoked if remote agent control is overwritten by another
+	// coordinator
+	OnOverwrite(inst M3DBInstance, desc string)
+}
+
 // M3DBInstanceHealth provides M3DBInstance Health
 type M3DBInstanceHealth struct {
 	Bootstrapped bool
@@ -144,6 +158,9 @@ type M3DBEnvironment interface {
 
 // Options are the knobs used to tweak Environment interactions
 type Options interface {
+	// Validate validates the Options
+	Validate() error
+
 	// SetOperatorOptions sets the operator.Options
 	SetOperatorOptions(operator.Options) Options
 
@@ -181,4 +198,10 @@ type Options interface {
 	// SessionOverride returns a flag indicating if m3em agent operations
 	// are permitted to override clashing resources
 	SessionOverride() bool
+
+	// SetListener sets the M3DBInstanceListener
+	SetListener(M3DBInstanceListener) Options
+
+	// Listener returns the M3DBInstanceListener
+	Listener() M3DBInstanceListener
 }

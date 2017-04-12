@@ -21,6 +21,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/m3db/m3em/build"
 
 	"github.com/m3db/m3cluster/services"
@@ -62,6 +64,18 @@ func NewOptions(
 		numShards:    defaultNumShards,
 		concurrency:  defaultConcurrency,
 	}
+}
+
+func (o m3dbClusterOpts) Validate() error {
+	if o.svcBuild == nil {
+		return fmt.Errorf("ServiceBuild is not set")
+	}
+
+	if o.svcConf == nil {
+		return fmt.Errorf("ServiceConf is not set")
+	}
+
+	return nil
 }
 
 func (o m3dbClusterOpts) SetInstrumentOptions(iopts instrument.Options) Options {

@@ -23,6 +23,7 @@ package environment
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/operator"
@@ -57,6 +58,8 @@ type m3dbInst struct {
 	currentBuild build.ServiceBuild
 	currentConf  build.ServiceConfiguration
 	operator     operator.Operator
+	opListener   operator.Listener
+	opListenerID operator.ListenerID
 	m3dbClient   m3dbrpc.TChanNode
 }
 
@@ -65,8 +68,11 @@ func NewM3DBInstance(
 	inst services.PlacementInstance,
 	op operator.Operator,
 	opts Options,
-) M3DBInstance {
-	return &m3dbInst{
+) (M3DBInstance, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+	retInst := &m3dbInst{
 		opts:     opts,
 		id:       inst.ID(),
 		rack:     inst.Rack(),
@@ -77,6 +83,16 @@ func NewM3DBInstance(
 		status:   InstanceStatusUninitialized,
 		operator: op,
 	}
+	if listener := opts.Listener(); listener != nil {
+		opListener := operator.NewListener(
+			func(s string) { listener.OnProcessTerminate(retInst, s) },
+			func(ts time.Time) { listener.OnHeartbeatTimeout(retInst, ts) },
+			func(s string) { listener.OnOverwrite(retInst, s) },
+		)
+		retInst.opListener = opListener
+		retInst.opListenerID = op.RegisterListener(opListener)
+	}
+	return retInst, nil
 }
 
 func (i *m3dbInst) String() string {
@@ -222,6 +238,11 @@ func (i *m3dbInst) Teardown() error {
 		status != InstanceStatusSetup &&
 		status != InstanceStatusError {
 		return errUnableToTeardownInstance
+	}
+
+	if i.opListener != nil {
+		i.operator.DeregisterListener(i.opListenerID)
+		i.opListener = nil
 	}
 
 	if err := i.operator.Teardown(); err != nil {

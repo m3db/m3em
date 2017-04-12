@@ -65,7 +65,8 @@ func newMockServiceInstances(ctrl *gomock.Controller, numInstances int) []servic
 }
 
 func newDefaultOptions() Options {
-	return NewOptions(nil)
+	return NewOptions(nil).
+		SetSessionToken("test-token")
 }
 
 func TestServiceInstancePropertyInitialization(t *testing.T) {
@@ -75,7 +76,8 @@ func TestServiceInstancePropertyInitialization(t *testing.T) {
 	opts := newDefaultOptions()
 	mockInstance := newMockServiceInstance(ctrl)
 	mockOperator := newMockOperator(ctrl)
-	m3dbInstance := NewM3DBInstance(mockInstance, mockOperator, opts)
+	m3dbInstance, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	require.NoError(t, err)
 	require.Equal(t, mockInstance.ID(), m3dbInstance.ID())
 }
 
@@ -85,7 +87,9 @@ func TestServiceInstanceErrorStatusTransitions(t *testing.T) {
 	opts := newDefaultOptions()
 	mockInstance := newMockServiceInstance(ctrl)
 	mockOperator := newMockOperator(ctrl)
-	m3dbInstance := NewM3DBInstance(mockInstance, mockOperator, opts).(*m3dbInst)
+	inst, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 	m3dbInstance.status = InstanceStatusError
 	require.Error(t, m3dbInstance.Start())
@@ -111,7 +115,8 @@ func TestServiceInstanceStatusTransitions(t *testing.T) {
 	mc := build.NewMockServiceConfiguration(ctrl)
 	mockInstance := newMockServiceInstance(ctrl)
 	mockOperator := newMockOperator(ctrl)
-	m3dbInstance := NewM3DBInstance(mockInstance, mockOperator, opts)
+	m3dbInstance, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	require.NoError(t, err)
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 
 	// uninitialized -> setup is the only valid (non-errorneous) transition
@@ -173,7 +178,8 @@ func TestServiceInstanceSetupBuildVerify(t *testing.T) {
 	mc := build.NewMockServiceConfiguration(ctrl)
 	mockInstance := newMockServiceInstance(ctrl)
 	mockOperator := newMockOperator(ctrl)
-	m3dbInstance := NewM3DBInstance(mockInstance, mockOperator, opts)
+	m3dbInstance, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	require.NoError(t, err)
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 
 	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
@@ -202,7 +208,9 @@ func TestHealthEndpoint(t *testing.T) {
 	opts := newDefaultOptions()
 	mockInstance := newMockServiceInstance(ctrl)
 	mockOperator := newMockOperator(ctrl)
-	m3dbInstance := NewM3DBInstance(mockInstance, mockOperator, opts).(*m3dbInst)
+	inst, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
 	m3dbInstance.m3dbClient = mockM3DBClient
 
 	health, err := m3dbInstance.Health()

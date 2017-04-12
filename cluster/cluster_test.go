@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/m3db/m3em/build"
 	env "github.com/m3db/m3em/environment"
 
 	"github.com/golang/mock/gomock"
@@ -38,10 +39,14 @@ var (
 	defaultRandomVar = rand.New(rand.NewSource(int64(defaultRandSeed)))
 )
 
-func newDefaultClusterTestOptions(psvc services.PlacementService) Options {
+func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.PlacementService) Options {
+	mockBuild := build.NewMockServiceBuild(ctrl)
+	mockConf := build.NewMockServiceConfiguration(ctrl)
 	return NewOptions(psvc, nil).
 		SetNumShards(10).
-		SetReplication(10)
+		SetReplication(10).
+		SetServiceBuild(mockBuild).
+		SetServiceConfig(mockConf)
 }
 
 func newMockEnvironment(ctrl *gomock.Controller, instances env.M3DBInstances) env.M3DBEnvironment {
@@ -108,7 +113,7 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl)
-	opts := newDefaultClusterTestOptions(mockPlacementService)
+	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
 	expectCalls := expectInstanceCallTypes{
 		expectReset:    true,
 		expectSetup:    true,
@@ -116,13 +121,15 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	}
 	instances := addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
 	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster := New(mockEnv, opts).(*m3dbCluster)
+	clusterIface, err := New(mockEnv, opts)
+	require.NoError(t, err)
+	cluster := clusterIface.(*m3dbCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 	cluster.status = ClusterStatusError
 
 	// illegal transitions
 	require.Error(t, cluster.Setup())
-	_, err := cluster.Initialize(1)
+	_, err = cluster.Initialize(1)
 	require.Error(t, err)
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
@@ -148,19 +155,21 @@ func TestClusterUninitializedStatusTransitions(t *testing.T) {
 	var (
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
-		opts                 = newDefaultClusterTestOptions(mockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		expectCalls          = expectInstanceCallTypes{expectSetup: true}
 		instances            = addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
 		mockEnv              = newMockEnvironment(ctrl, instances)
-		cluster              = New(mockEnv, opts)
+		clusterIface, err    = New(mockEnv, opts)
 	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*m3dbCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
 	// illegal transitions
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
 	require.Error(t, cluster.Stop())
-	_, err := cluster.AddInstance()
+	_, err = cluster.AddInstance()
 	require.Error(t, err)
 	err = cluster.RemoveInstance(nil)
 	require.Error(t, err)
@@ -180,17 +189,18 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 	var (
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
-		opts                 = newDefaultClusterTestOptions(mockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		expectCalls          = expectInstanceCallTypes{
 			expectSetup:    true,
 			expectTeardown: true,
 			expectReset:    true,
 		}
-		instances = addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
-		mockEnv   = newMockEnvironment(ctrl, instances)
-		cluster   = New(mockEnv, opts)
+		instances    = addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
+		mockEnv      = newMockEnvironment(ctrl, instances)
+		cluster, err = New(mockEnv, opts)
 	)
 
+	require.NoError(t, err)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
 	mpsvc.EXPECT().Delete().Return(nil)
@@ -202,7 +212,7 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
 	require.Error(t, cluster.Stop())
-	_, err := cluster.AddInstance()
+	_, err = cluster.AddInstance()
 	require.Error(t, err)
 	err = cluster.RemoveInstance(nil)
 	require.Error(t, err)
@@ -230,7 +240,7 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl).(*services.MockPlacementService)
-	opts := newDefaultClusterTestOptions(mockPlacementService)
+	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
 	expectCalls := expectInstanceCallTypes{
 		expectSetup:    true,
 		expectTeardown: true,
@@ -240,14 +250,16 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 
 	instances := addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
 	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster := New(mockEnv, opts).(*m3dbCluster)
+	clusterIface, err := New(mockEnv, opts)
+	require.NoError(t, err)
+	cluster := clusterIface.(*m3dbCluster)
 	cluster.status = ClusterStatusRunning
 
 	// illegal transitions
 	require.Error(t, cluster.Setup())
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
-	_, err := cluster.Initialize(1)
+	_, err = cluster.Initialize(1)
 	require.Error(t, err)
 
 	// reset (legal)
@@ -291,7 +303,7 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl).(*services.MockPlacementService)
-	opts := newDefaultClusterTestOptions(mockPlacementService)
+	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
 	expectCalls := expectInstanceCallTypes{
 		expectTeardown: true,
 		expectReset:    true,
@@ -300,13 +312,15 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 
 	instances := addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
 	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster := New(mockEnv, opts).(*m3dbCluster)
+	clusterIface, err := New(mockEnv, opts)
+	require.NoError(t, err)
+	cluster := clusterIface.(*m3dbCluster)
 	cluster.status = ClusterStatusInitialized
 
 	// illegal transitions
 	require.Error(t, cluster.Setup())
 	require.Error(t, cluster.Stop())
-	_, err := cluster.Initialize(1)
+	_, err = cluster.Initialize(1)
 	require.Error(t, err)
 
 	// reset (legal)
@@ -357,7 +371,7 @@ func TestClusterSetup(t *testing.T) {
 	var (
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
-		opts                 = newDefaultClusterTestOptions(mockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		instances            = newMockM3DBInstances(ctrl, 5)
 	)
 	for _, inst := range instances {
@@ -365,7 +379,8 @@ func TestClusterSetup(t *testing.T) {
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster := New(mockEnv, opts)
+	cluster, err := New(mockEnv, opts)
+	require.NoError(t, err)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
 	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
@@ -380,7 +395,7 @@ func TestClusterInitialize(t *testing.T) {
 	var (
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
-		opts                 = newDefaultClusterTestOptions(mockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		instances            = newMockM3DBInstances(ctrl, 5)
 	)
 	for _, inst := range instances {
@@ -388,7 +403,8 @@ func TestClusterInitialize(t *testing.T) {
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster := New(mockEnv, opts)
+	cluster, err := New(mockEnv, opts)
+	require.NoError(t, err)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
 	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
@@ -396,7 +412,7 @@ func TestClusterInitialize(t *testing.T) {
 	require.NoError(t, cluster.Setup())
 	require.Equal(t, ClusterStatusSetup, cluster.Status())
 
-	_, err := cluster.Initialize(10)
+	_, err = cluster.Initialize(10)
 	require.Error(t, err)
 
 	mpsvc.EXPECT().BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)

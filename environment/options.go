@@ -21,6 +21,7 @@
 package environment
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/m3db/m3em/operator"
@@ -30,7 +31,6 @@ import (
 )
 
 const (
-	defaultToken              = ""
 	defaultSessionOverride    = false
 	defaultInstanceOptTimeout = 90 * time.Second
 )
@@ -42,6 +42,7 @@ type opts struct {
 	instanceOpTimeout time.Duration
 	sessionOverride   bool
 	token             string
+	listener          M3DBInstanceListener
 }
 
 // NewOptions returns a new Options object
@@ -54,8 +55,15 @@ func NewOptions(iopts instrument.Options) Options {
 		instanceOpRetrier: xretry.NewRetrier(xretry.NewOptions()),
 		instanceOpTimeout: defaultInstanceOptTimeout,
 		sessionOverride:   defaultSessionOverride,
-		token:             defaultToken,
+		operatorOpts:      operator.NewOptions(iopts),
 	}
+}
+
+func (o opts) Validate() error {
+	if o.token == "" {
+		return fmt.Errorf("no session token set")
+	}
+	return o.operatorOpts.Validate()
 }
 
 func (o opts) SetInstrumentOptions(iopts instrument.Options) Options {
@@ -110,4 +118,13 @@ func (o opts) SetSessionOverride(override bool) Options {
 
 func (o opts) SessionOverride() bool {
 	return o.sessionOverride
+}
+
+func (o opts) SetListener(l M3DBInstanceListener) Options {
+	o.listener = l
+	return o
+}
+
+func (o opts) Listener() M3DBInstanceListener {
+	return o.listener
 }

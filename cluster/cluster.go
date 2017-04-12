@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"sync"
 
-	env "github.com/m3db/m3em/environment"
 	"github.com/m3db/m3cluster/services"
 	m3dbclient "github.com/m3db/m3db/client"
+	env "github.com/m3db/m3em/environment"
 	"github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 )
@@ -60,7 +60,14 @@ type m3dbCluster struct {
 }
 
 // New returns a new M3DB cluster of instances backed by the provided environment
-func New(m3env env.M3DBEnvironment, cOpts Options) Cluster {
+func New(
+	m3env env.M3DBEnvironment,
+	cOpts Options,
+) (Cluster, error) {
+	if err := cOpts.Validate(); err != nil {
+		return nil, err
+	}
+
 	return &m3dbCluster{
 		logger:        cOpts.InstrumentOptions().Logger(),
 		copts:         cOpts,
@@ -68,7 +75,7 @@ func New(m3env env.M3DBEnvironment, cOpts Options) Cluster {
 		usedInstances: make(idToInstanceMap, len(m3env.Instances())),
 		placementSvc:  cOpts.PlacementService(),
 		status:        ClusterStatusUninitialized,
-	}
+	}, nil
 }
 
 // TODO(prateek): reset initial placement after teardown
