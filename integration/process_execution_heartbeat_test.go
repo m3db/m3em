@@ -61,7 +61,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	require.NoError(t, err)
 	defer heartbeatListener.Close()
 
-	// create operator agent
+	// create agent
 	aOpts := agent.NewOptions(iopts).SetWorkingDirectory(targetLocation)
 	server := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
 	agentService, err := agent.New(aOpts)
