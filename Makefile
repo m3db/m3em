@@ -25,7 +25,7 @@ protoc_go_package := github.com/golang/protobuf/protoc-gen-go
 proto_output_dir := generated/proto
 proto_rules_dir := generated/proto
 
-BUILD := $(abspath ./out)
+BUILD := $(abspath ./bin)
 LINUX_AMD64_ENV := GOOS=linux GOARCH=amd64 CGO_ENABLED=0
 VENDOR_ENV := GO15VENDOREXPERIMENT=1
 
@@ -49,6 +49,9 @@ prod-services:
 	$(LINUX_AMD64_ENV) make services
 
 $(foreach SERVICE,$(SERVICES),$(eval $(SERVICE_RULES)))
+
+all: lint test-ci-unit test-ci-integration services
+	@echo Make all succsessfully
 
 lint:
 	@which golint > /dev/null || go get -u github.com/golang/lint/golint
@@ -112,4 +115,4 @@ clean:
 	echo
 
 .DEFAULT_GOAL := test
-.PHONY: test test-xml test-internal testhtml clean
+.PHONY: test test-xml test-internal testhtml clean all
