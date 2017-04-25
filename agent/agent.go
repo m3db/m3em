@@ -102,28 +102,20 @@ func New(
 	return agent, nil
 }
 
+func updateBoolGauge(b bool, m tally.Gauge) {
+	if b {
+		m.Update(1)
+	} else {
+		m.Update(0)
+	}
+}
+
 func (o *opAgent) reportMetrics() {
 	for {
 		running, exec, conf := o.state()
-
-		if running {
-			o.metrics.running.Update(float64(1))
-		} else {
-			o.metrics.running.Update(float64(0))
-		}
-
-		if exec != "" {
-			o.metrics.execTransferred.Update(float64(1))
-		} else {
-			o.metrics.execTransferred.Update(float64(0))
-		}
-
-		if conf != "" {
-			o.metrics.confTransferred.Update(float64(1))
-		} else {
-			o.metrics.confTransferred.Update(float64(0))
-		}
-
+		updateBoolGauge(running, o.metrics.running)
+		updateBoolGauge(exec != "", o.metrics.execTransferred)
+		updateBoolGauge(conf != "", o.metrics.confTransferred)
 		time.Sleep(defaultReportInterval)
 	}
 }
