@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
+const (
 	rngSeed            = int64(123456789)
 	defaultUniqueBytes = int64(1024 * 8)
 )

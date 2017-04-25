@@ -520,11 +520,11 @@ func (h *opAgentHeartBeater) sendHealthyHeartbeat() {
 }
 
 func (h *opAgentHeartBeater) heartbeatLoop(d time.Duration) {
-	defer h.wg.Done()
 	defer func() {
 		h.Lock()
 		h.running = false
 		h.Unlock()
+		h.wg.Done()
 	}()
 
 	// explicitly send first heartbeat as soon as we start

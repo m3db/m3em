@@ -188,11 +188,12 @@ func (h *opHeartbeatServer) monitorLoop() {
 			monitor = false
 		case <-checkTicker.C:
 			last := h.lastHeartbeatTime()
-			if last != lastCheck {
-				lastCheck = last
-				if !lastCheck.IsZero() && nowFn().Sub(lastCheck) > timeoutInterval {
-					h.listeners.notifyTimeout(lastCheck)
-				}
+			if last == lastCheck {
+				continue
+			}
+			lastCheck = last
+			if !lastCheck.IsZero() && nowFn().Sub(lastCheck) > timeoutInterval {
+				h.listeners.notifyTimeout(lastCheck)
 			}
 		}
 	}
