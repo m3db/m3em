@@ -26,7 +26,6 @@ import (
 	"github.com/m3db/m3em/build"
 
 	"github.com/m3db/m3cluster/services"
-	m3dbclient "github.com/m3db/m3db/client"
 	"github.com/m3db/m3x/instrument"
 )
 
@@ -38,7 +37,6 @@ var (
 
 type m3dbClusterOpts struct {
 	iopts        instrument.Options
-	adminOpts    m3dbclient.AdminOptions
 	svcBuild     build.ServiceBuild
 	svcConf      build.ServiceConfiguration
 	placementSvc services.PlacementService
@@ -58,7 +56,6 @@ func NewOptions(
 	}
 	return m3dbClusterOpts{
 		iopts:        iopts,
-		adminOpts:    m3dbclient.NewAdminOptions(),
 		placementSvc: placementSvc,
 		replication:  defaultReplication,
 		numShards:    defaultNumShards,
@@ -73,6 +70,10 @@ func (o m3dbClusterOpts) Validate() error {
 
 	if o.svcConf == nil {
 		return fmt.Errorf("ServiceConf is not set")
+	}
+
+	if o.placementSvc == nil {
+		return fmt.Errorf("PlacementService is not set")
 	}
 
 	return nil
@@ -105,15 +106,6 @@ func (o m3dbClusterOpts) ServiceConfig() build.ServiceConfiguration {
 	return o.svcConf
 }
 
-func (o m3dbClusterOpts) SetMaxInstances(mi int) Options {
-	o.maxInstances = mi
-	return o
-}
-
-func (o m3dbClusterOpts) MaxInstances() int {
-	return o.maxInstances
-}
-
 func (o m3dbClusterOpts) SetReplication(r int) Options {
 	o.replication = r
 	return o
@@ -130,15 +122,6 @@ func (o m3dbClusterOpts) SetNumShards(ns int) Options {
 
 func (o m3dbClusterOpts) NumShards() int {
 	return o.numShards
-}
-
-func (o m3dbClusterOpts) SetAdminClientOptions(opts m3dbclient.AdminOptions) Options {
-	o.adminOpts = opts
-	return o
-}
-
-func (o m3dbClusterOpts) AdminClientOptions() m3dbclient.AdminOptions {
-	return o.adminOpts
 }
 
 func (o m3dbClusterOpts) SetPlacementService(psvc services.PlacementService) Options {

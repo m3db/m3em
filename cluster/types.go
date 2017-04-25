@@ -25,7 +25,6 @@ import (
 	env "github.com/m3db/m3em/environment"
 
 	"github.com/m3db/m3cluster/services"
-	m3dbc "github.com/m3db/m3db/client"
 	"github.com/m3db/m3x/instrument"
 )
 
@@ -166,14 +165,6 @@ type Options interface {
 	// used in setting up the cluster
 	ServiceConfig() build.ServiceConfiguration
 
-	// SetMaxInstances sets the maximum number of instances to be used
-	// in the cluster
-	SetMaxInstances(int) Options
-
-	// MaxInstances returns the maximum number of instances used in
-	// the cluster
-	MaxInstances() int
-
 	// SetReplication sets the replication factor for the cluster
 	SetReplication(int) Options
 
@@ -185,14 +176,6 @@ type Options interface {
 
 	// NumShards returns the number of shards used in the cluster
 	NumShards() int
-
-	// SetAdminClientOptions sets the admin client options used in
-	// the creation of m3db.Client objects
-	SetAdminClientOptions(m3dbc.AdminOptions) Options
-
-	// AdminClientOptions returns the admin client options used in
-	// the creation of m3db.Client objects
-	AdminClientOptions() m3dbc.AdminOptions
 
 	// SetPlacementService returns the PlacementService to use for cluster
 	// configuration
