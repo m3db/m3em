@@ -160,7 +160,7 @@ func (h *opHeartbeatServer) start() error {
 
 	h.running = true
 	h.wg.Add(1)
-	go h.monitorLoop()
+	go h.monitorTimeout()
 	return nil
 }
 
@@ -170,7 +170,7 @@ func (h *opHeartbeatServer) lastHeartbeatTime() time.Time {
 	return h.lastHeartbeatTs
 }
 
-func (h *opHeartbeatServer) monitorLoop() {
+func (h *opHeartbeatServer) monitorTimeout() {
 	defer h.wg.Done()
 	var (
 		monitor         = true
