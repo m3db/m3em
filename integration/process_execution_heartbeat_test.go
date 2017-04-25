@@ -113,14 +113,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	defer op.DeregisterListener(id)
 
 	// create test build
-	scriptContents := []byte(`#!/usr/bin/env bash
-if [ "$#" -ne 2 ]; then
-	echo "Args: $@" >&2
-	echo "Illegal number of arguments" >&2
-	exit 1
-fi
-echo -ne "testing random output"`)
-	execScript := newTestScript(t, targetLocation, 0, scriptContents)
+	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
 	testBuildID := "target-file.sh"
 	testBinary := build.NewM3DBBuild(testBuildID, execScript)
 

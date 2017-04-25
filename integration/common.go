@@ -40,6 +40,23 @@ const (
 	defaultUniqueBytes = int64(1024 * 8)
 )
 
+type testProgram []byte
+
+var (
+	shortLivedTestProgram = testProgram([]byte(`#!/usr/bin/env bash
+if [ "$#" -ne 2 ]; then
+	echo "Args: $@" >&2
+	echo "Illegal number of arguments" >&2
+	exit 1
+fi
+echo -ne "testing random output"`))
+
+	longRunningTestProgram = testProgram([]byte(`#!/usr/bin/env bash
+	echo -ne "testing random output"
+	while true; do sleep 1; done
+	echo -ne "should never get this"`))
+)
+
 func newTempFile(t *testing.T, dir string, content []byte) *os.File {
 	tmpfile, err := ioutil.TempFile(dir, "example")
 	require.NoError(t, err)
@@ -50,11 +67,12 @@ func newTempFile(t *testing.T, dir string, content []byte) *os.File {
 	return tmpfile
 }
 
-func newTestScript(t *testing.T, dir string, scriptNum int, scriptContents []byte) string {
+func newTestScript(t *testing.T, dir string, scriptNum int, script testProgram) string {
 	file, err := ioutil.TempFile(dir, fmt.Sprintf("testscript%d.sh", scriptNum))
 	require.NoError(t, err)
 	name := file.Name()
 	require.NoError(t, file.Chmod(0755))
+	scriptContents := []byte(script)
 	numWritten, err := file.Write(scriptContents)
 	require.NoError(t, err)
 	require.Equal(t, len(scriptContents), numWritten)

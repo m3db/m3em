@@ -70,11 +70,7 @@ func TestProccessStreamingOutputExecution(t *testing.T) {
 	require.NoError(t, err)
 
 	// create test build
-	scriptContents := []byte(`#!/usr/bin/env bash
-echo -ne "testing random output"
-sleep 100
-echo -ne "should never get here"`)
-	execScript := newTestScript(t, targetLocation, 0, scriptContents)
+	execScript := newTestScript(t, targetLocation, 0, longRunningTestProgram)
 	testBuildID := "target-file.sh"
 	testBinary := build.NewM3DBBuild(testBuildID, execScript)
 

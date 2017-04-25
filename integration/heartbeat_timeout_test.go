@@ -28,11 +28,13 @@ import (
 	"net"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
+	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/operator"
 
@@ -41,7 +43,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func TestProcessExecution(t *testing.T) {
+func TestHeartbeatTimeout(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -49,28 +51,71 @@ func TestProcessExecution(t *testing.T) {
 	defer os.RemoveAll(targetLocation)
 
 	iopts := instrument.NewOptions()
-	// create listener, get free port from OS
-	l, _ := net.Listen("tcp", "127.0.0.1:0")
-	defer l.Close()
+	// create agent listener, get free port from OS
+	agentListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer agentListener.Close()
 
-	// create operator agent
+	// create heartbeat listener, get free port from OS
+	heartbeatListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer heartbeatListener.Close()
+
+	// create agent
 	aOpts := agent.NewOptions(iopts).SetWorkingDirectory(targetLocation)
 	server := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
 	agentService, err := agent.New(aOpts)
 	require.NoError(t, err)
 	m3em.RegisterOperatorServer(server, agentService)
 	go func() {
-		server.Serve(l)
+		server.Serve(agentListener)
 	}()
 	defer server.GracefulStop()
 
+	// create new heartbeat router
+	hbRouter := operator.NewHeartbeatRouter(heartbeatListener.Addr().String())
+	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+	hb.RegisterHeartbeaterServer(hbServer, hbRouter)
+	go func() {
+		hbServer.Serve(heartbeatListener)
+	}()
+
 	// create operator to communicate with agent
-	oOpts := operator.NewOptions(iopts)
-	op, err := operator.New(l.Addr().String(), oOpts)
+	hbOpts := operator.NewHeartbeatOptions().
+		SetEnabled(true).
+		SetHeartbeatRouter(hbRouter).
+		SetTimeout(2 * time.Second).
+		SetCheckInterval(100 * time.Millisecond).
+		SetInterval(200 * time.Millisecond)
+	oOpts := operator.NewOptions(iopts).
+		SetHeartbeatOptions(hbOpts)
+	op, err := operator.New(agentListener.Addr().String(), oOpts)
 	require.NoError(t, err)
 
+	// capture notifications from operator
+	var (
+		lock            sync.Mutex
+		receivedTimeout = false
+	)
+	operatorEventListener := operator.NewListener(
+		func(s string) {
+			require.FailNow(t, "received termination: %v", s)
+		},
+		func(ts time.Time) {
+			require.False(t, receivedTimeout)
+			lock.Lock()
+			receivedTimeout = true
+			lock.Unlock()
+		},
+		func(s string) {
+			require.FailNow(t, "received overwrite: %v", s)
+		},
+	)
+	id := op.RegisterListener(operatorEventListener)
+	defer op.DeregisterListener(id)
+
 	// create test build
-	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
+	execScript := newTestScript(t, targetLocation, 0, longRunningTestProgram)
 	testBuildID := "target-file.sh"
 	testBinary := build.NewM3DBBuild(testBuildID, execScript)
 
@@ -85,8 +130,14 @@ func TestProcessExecution(t *testing.T) {
 
 	// execute the build
 	require.NoError(t, op.Start())
-	stopped := waitUntilAgentFinished(agentService, time.Second)
-	require.True(t, stopped)
+
+	// stop the heartbeating router so we don't get any more updates
+	hbServer.Stop()
+	time.Sleep(2 * hbOpts.Timeout())
+
+	// ensure we were notified of exit at the operator level
+	require.True(t, receivedTimeout)
+	iopts.Logger().Infof("received heartbeat timeout in operator")
 
 	stderrFile := path.Join(targetLocation, fmt.Sprintf("%s.err", testBuildID))
 	stderrContents, err := ioutil.ReadFile(stderrFile)

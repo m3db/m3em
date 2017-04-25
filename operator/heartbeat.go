@@ -173,12 +173,12 @@ func (h *opHeartbeatServer) lastHeartbeatTime() time.Time {
 func (h *opHeartbeatServer) monitorTimeout() {
 	defer h.wg.Done()
 	var (
-		monitor         = true
-		checkInterval   = h.opts.CheckInterval()
-		timeoutInterval = h.opts.Timeout()
-		nowFn           = h.opts.NowFn()
-		checkTicker     = time.NewTicker(checkInterval)
-		lastCheck       time.Time
+		monitor            = true
+		checkInterval      = h.opts.CheckInterval()
+		timeoutInterval    = h.opts.Timeout()
+		nowFn              = h.opts.NowFn()
+		checkTicker        = time.NewTicker(checkInterval)
+		lastNotificationTs time.Time
 	)
 
 	for monitor {
@@ -188,12 +188,9 @@ func (h *opHeartbeatServer) monitorTimeout() {
 			monitor = false
 		case <-checkTicker.C:
 			last := h.lastHeartbeatTime()
-			if last == lastCheck {
-				continue
-			}
-			lastCheck = last
-			if !lastCheck.IsZero() && nowFn().Sub(lastCheck) > timeoutInterval {
-				h.listeners.notifyTimeout(lastCheck)
+			if !last.IsZero() && nowFn().Sub(last) > timeoutInterval && lastNotificationTs != last {
+				h.listeners.notifyTimeout(last)
+				lastNotificationTs = last
 			}
 		}
 	}
