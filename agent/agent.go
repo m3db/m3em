@@ -67,6 +67,23 @@ type opAgent struct {
 	heartbeater    *opAgentHeartBeater
 }
 
+// New creates and retuns a new Operator Agent
+func New(
+	opts Options,
+) (Agent, error) {
+	if err := canaryWriteTest(opts.WorkingDirectory()); err != nil {
+		return nil, err
+	}
+
+	agent := &opAgent{
+		opts:    opts,
+		logger:  opts.InstrumentOptions().Logger(),
+		metrics: newAgentMetrics(opts.InstrumentOptions().MetricsScope()),
+	}
+	go agent.reportMetrics() // TODO(prateek): don't leak this
+	return agent, nil
+}
+
 func canaryWriteTest(dir string) error {
 	fi, err := os.Stat(dir)
 	if err != nil {
@@ -83,23 +100,6 @@ func canaryWriteTest(dir string) error {
 	os.Remove(fd.Name())
 
 	return nil
-}
-
-// New creates and retuns a new Operator Agent
-func New(
-	opts Options,
-) (Agent, error) {
-	if err := canaryWriteTest(opts.WorkingDirectory()); err != nil {
-		return nil, err
-	}
-
-	agent := &opAgent{
-		opts:    opts,
-		logger:  opts.InstrumentOptions().Logger(),
-		metrics: newAgentMetrics(opts.InstrumentOptions().MetricsScope()),
-	}
-	go agent.reportMetrics() // TODO(prateek): don't leak this
-	return agent, nil
 }
 
 func updateBoolGauge(b bool, m tally.Gauge) {
