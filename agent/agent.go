@@ -205,23 +205,23 @@ func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.
 func (o *opAgent) newProcessListener() exec.ProcessListener {
 	onComplete := func() {
 		o.Lock()
+		defer o.Unlock()
 		err := fmt.Errorf("test process terminated without error")
 		o.logger.Warnf("%v", err)
 		o.running = false
 		if o.heartbeater != nil {
 			o.heartbeater.notifyProcessTermination(err)
 		}
-		o.Unlock()
 	}
 	onError := func(err error) {
 		o.Lock()
+		defer o.Unlock()
 		newErr := fmt.Errorf("test process terminated with error: %v", err)
 		o.logger.Warnf("%v", newErr)
 		o.running = false
 		if o.heartbeater != nil {
 			o.heartbeater.notifyProcessTermination(err)
 		}
-		o.Unlock()
 	}
 	return exec.NewProcessListener(onComplete, onError)
 }
@@ -491,9 +491,8 @@ func newHeartbeater(
 
 func (h *opAgentHeartBeater) isRunning() bool {
 	h.RLock()
-	running := h.running
-	h.RUnlock()
-	return running
+	defer h.RUnlock()
+	return h.running
 }
 
 func (h *opAgentHeartBeater) defaultHeartbeat() hb.HeartbeatRequest {

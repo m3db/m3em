@@ -191,7 +191,7 @@ func TestHeartbeatingTimeout(t *testing.T) {
 			Code: hb.HeartbeatCode_HEALTHY,
 		})
 	require.NoError(t, err)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	hbServer.stop()
 
 	lock.Lock()

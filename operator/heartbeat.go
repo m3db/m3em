@@ -48,8 +48,6 @@ func NewHeartbeatRouter(endpoint string) HeartbeatRouter {
 }
 
 func (hr *heartbeatRouter) Endpoint() string {
-	hr.RLock()
-	defer hr.RUnlock()
 	return hr.endpoint
 }
 
@@ -110,7 +108,7 @@ type opHeartbeatServer struct {
 	lastHeartbeat   hb.HeartbeatRequest
 	lastHeartbeatTs time.Time
 	running         bool
-	stopChan        chan bool
+	stopChan        chan struct{}
 	wg              sync.WaitGroup
 }
 
@@ -148,7 +146,7 @@ func newHeartbeater(
 		opts:      opts,
 		iopts:     iopts,
 		listeners: lg,
-		stopChan:  make(chan bool, 1),
+		stopChan:  make(chan struct{}, 1),
 	}
 	return h
 }
@@ -179,24 +177,23 @@ func (h *opHeartbeatServer) monitorLoop() {
 		checkInterval   = h.opts.CheckInterval()
 		timeoutInterval = h.opts.Timeout()
 		nowFn           = h.opts.NowFn()
+		checkTicker     = time.NewTicker(checkInterval)
 		lastCheck       time.Time
 	)
 
 	for monitor {
 		select {
 		case <-h.stopChan:
+			checkTicker.Stop()
 			monitor = false
-		default:
+		case <-checkTicker.C:
 			last := h.lastHeartbeatTime()
-			if last == lastCheck {
-				time.Sleep(checkInterval)
-				continue
+			if last != lastCheck {
+				lastCheck = last
+				if !lastCheck.IsZero() && nowFn().Sub(lastCheck) > timeoutInterval {
+					h.listeners.notifyTimeout(lastCheck)
+				}
 			}
-			lastCheck = last
-			if !lastCheck.IsZero() && nowFn().Sub(lastCheck) > timeoutInterval {
-				h.listeners.notifyTimeout(lastCheck)
-			}
-			time.Sleep(checkInterval)
 		}
 	}
 }
@@ -216,7 +213,7 @@ func (h *opHeartbeatServer) stop() {
 	}
 
 	h.running = false
-	h.stopChan <- true
+	h.stopChan <- struct{}{}
 	h.Unlock()
 	h.wg.Wait()
 }

@@ -25,12 +25,15 @@ import (
 	"time"
 )
 
-var (
+const (
 	defaultEnabled           = false
-	defaultNowFn             = time.Now
 	defaultHeartbeatInterval = 10 * time.Second
 	defaultCheckInterval     = 2 * time.Second
 	defaultHeartbeatTimeout  = 30 * time.Second
+)
+
+var (
+	defaultNowFn = time.Now
 )
 
 type heartbeatOpts struct {
