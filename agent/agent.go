@@ -44,10 +44,10 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-var (
+const (
 	defaultReportInterval       = time.Duration(5 * time.Second)
+	defaultHeartbeatConnTimeout = time.Minute
 	defaultTestCanaryPrefix     = "test-canary-file"
-	defaultHeartbeatConnTimeout = time.Duration(1 * time.Minute)
 )
 
 var (
