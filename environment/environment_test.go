@@ -48,15 +48,23 @@ func mockM3DBInstances(
 	return m3dbInstances
 }
 
+func newTestEnv(
+	t *testing.T,
+	ctrl *gomock.Controller,
+	numInstances int,
+) (M3DBInstances, M3DBEnvironment) {
+	opts := NewOptions(nil)
+	instances := mockM3DBInstances(ctrl, numInstances)
+	env, err := NewM3DBEnvironment(instances, opts)
+	require.NoError(t, err)
+	return instances, env
+}
+
 func TestNewEnvInstances(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	opts := NewOptions(nil)
-	instances := mockM3DBInstances(ctrl, 5)
-	env, err := NewM3DBEnvironment(instances, opts)
-	require.NoError(t, err)
-
+	instances, env := newTestEnv(t, ctrl, 5)
 	envInstances := env.Instances()
 	require.Equal(t, len(instances), len(envInstances))
 	for i := range instances {
@@ -68,11 +76,7 @@ func TestNewEnvInstancesByID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	opts := NewOptions(nil)
-	instances := mockM3DBInstances(ctrl, 5)
-	env, err := NewM3DBEnvironment(instances, opts)
-	require.NoError(t, err)
-
+	instances, env := newTestEnv(t, ctrl, 5)
 	envInstances := env.InstancesByID()
 	require.Equal(t, len(instances), len(envInstances))
 	for i := range instances {
