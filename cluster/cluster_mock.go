@@ -26,7 +26,6 @@ package cluster
 import (
 	gomock "github.com/golang/mock/gomock"
 	services "github.com/m3db/m3cluster/services"
-	client "github.com/m3db/m3db/client"
 	build "github.com/m3db/m3em/build"
 	environment "github.com/m3db/m3em/environment"
 	instrument "github.com/m3db/m3x/instrument"
@@ -176,26 +175,6 @@ func (_mr *_MockClusterRecorder) Status() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Status")
 }
 
-func (_m *MockCluster) Client() client.Client {
-	ret := _m.ctrl.Call(_m, "Client")
-	ret0, _ := ret[0].(client.Client)
-	return ret0
-}
-
-func (_mr *_MockClusterRecorder) Client() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Client")
-}
-
-func (_m *MockCluster) AdminClient() client.AdminClient {
-	ret := _m.ctrl.Call(_m, "AdminClient")
-	ret0, _ := ret[0].(client.AdminClient)
-	return ret0
-}
-
-func (_mr *_MockClusterRecorder) AdminClient() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "AdminClient")
-}
-
 // Mock of Options interface
 type MockOptions struct {
 	ctrl     *gomock.Controller
@@ -215,6 +194,16 @@ func NewMockOptions(ctrl *gomock.Controller) *MockOptions {
 
 func (_m *MockOptions) EXPECT() *_MockOptionsRecorder {
 	return _m.recorder
+}
+
+func (_m *MockOptions) Validate() error {
+	ret := _m.ctrl.Call(_m, "Validate")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) Validate() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Validate")
 }
 
 func (_m *MockOptions) SetInstrumentOptions(_param0 instrument.Options) Options {
@@ -277,26 +266,6 @@ func (_mr *_MockOptionsRecorder) ServiceConfig() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ServiceConfig")
 }
 
-func (_m *MockOptions) SetMaxInstances(_param0 int) Options {
-	ret := _m.ctrl.Call(_m, "SetMaxInstances", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetMaxInstances(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetMaxInstances", arg0)
-}
-
-func (_m *MockOptions) MaxInstances() int {
-	ret := _m.ctrl.Call(_m, "MaxInstances")
-	ret0, _ := ret[0].(int)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) MaxInstances() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "MaxInstances")
-}
-
 func (_m *MockOptions) SetReplication(_param0 int) Options {
 	ret := _m.ctrl.Call(_m, "SetReplication", _param0)
 	ret0, _ := ret[0].(Options)
@@ -335,26 +304,6 @@ func (_m *MockOptions) NumShards() int {
 
 func (_mr *_MockOptionsRecorder) NumShards() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NumShards")
-}
-
-func (_m *MockOptions) SetAdminClientOptions(_param0 client.AdminOptions) Options {
-	ret := _m.ctrl.Call(_m, "SetAdminClientOptions", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetAdminClientOptions(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetAdminClientOptions", arg0)
-}
-
-func (_m *MockOptions) AdminClientOptions() client.AdminOptions {
-	ret := _m.ctrl.Call(_m, "AdminClientOptions")
-	ret0, _ := ret[0].(client.AdminOptions)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) AdminClientOptions() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "AdminClientOptions")
 }
 
 func (_m *MockOptions) SetPlacementService(_param0 services.PlacementService) Options {

@@ -379,6 +379,16 @@ func (_mr *_MockOptionsRecorder) InstrumentOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstrumentOptions")
 }
 
+func (_m *MockOptions) Listener() M3DBInstanceListener {
+	ret := _m.ctrl.Call(_m, "Listener")
+	ret0, _ := ret[0].(M3DBInstanceListener)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) Listener() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Listener")
+}
+
 func (_m *MockOptions) OperatorOptions() operator.Options {
 	ret := _m.ctrl.Call(_m, "OperatorOptions")
 	ret0, _ := ret[0].(operator.Options)
@@ -439,6 +449,16 @@ func (_mr *_MockOptionsRecorder) SetInstrumentOptions(arg0 interface{}) *gomock.
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstrumentOptions", arg0)
 }
 
+func (_m *MockOptions) SetListener(_param0 M3DBInstanceListener) Options {
+	ret := _m.ctrl.Call(_m, "SetListener", _param0)
+	ret0, _ := ret[0].(Options)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SetListener(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetListener", arg0)
+}
+
 func (_m *MockOptions) SetOperatorOptions(_param0 operator.Options) Options {
 	ret := _m.ctrl.Call(_m, "SetOperatorOptions", _param0)
 	ret0, _ := ret[0].(Options)
@@ -467,4 +487,14 @@ func (_m *MockOptions) SetSessionToken(_param0 string) Options {
 
 func (_mr *_MockOptionsRecorder) SetSessionToken(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetSessionToken", arg0)
+}
+
+func (_m *MockOptions) Validate() error {
+	ret := _m.ctrl.Call(_m, "Validate")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) Validate() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Validate")
 }
