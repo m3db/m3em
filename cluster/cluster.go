@@ -195,7 +195,7 @@ func (c *m3dbCluster) AddInstance() (env.M3DBInstance, error) {
 	}
 	inst := c.spares[0]
 	psvc := c.placementSvc
-	_, err := psvc.AddInstance([]services.PlacementInstance{inst})
+	_, _, err := psvc.AddInstance([]services.PlacementInstance{inst})
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ func (c *m3dbCluster) ReplaceInstance(oldInstance env.M3DBInstance) (env.M3DBIns
 
 	spareInstance := c.spares[0]
 	psvc := c.placementSvc
-	_, err := psvc.ReplaceInstance(oldInstance.ID(), []services.PlacementInstance{spareInstance})
+	_, _, err := psvc.ReplaceInstance(oldInstance.ID(), []services.PlacementInstance{spareInstance})
 	if err != nil {
 		return nil, err
 	}

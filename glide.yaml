@@ -10,7 +10,7 @@ import:
   - proto
   - protoc-gen-go
 - package: github.com/m3db/m3cluster
-  version: 1054ce5875f3f13519cfc1c4e816c06bab8587fe
+  version: 5e66868870e23c1182c7788714d9f46f61449c54
   subpackages:
   - services
   - shard
