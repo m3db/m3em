@@ -278,14 +278,14 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
 	// add (legal)
-	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil)
+	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusRunning
 	added, err := cluster.AddInstance()
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusRunning, cluster.Status())
 
 	// replace (legal)
-	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil)
+	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusRunning
 	replaced, err := cluster.ReplaceInstance(added)
 	require.NoError(t, err)
@@ -344,14 +344,14 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
 	// add (legal)
-	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil)
+	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusInitialized
 	added, err := cluster.AddInstance()
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusInitialized, cluster.Status())
 
 	// replace (legal)
-	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil)
+	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusInitialized
 	replaced, err := cluster.ReplaceInstance(added)
 	require.NoError(t, err)
