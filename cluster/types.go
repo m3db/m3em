@@ -165,6 +165,20 @@ type Options interface {
 	// used in setting up the cluster
 	ServiceConfig() build.ServiceConfiguration
 
+	// SetSessionToken sets the token used for interactions with remote m3em agents
+	SetSessionToken(string) Options
+
+	// SessionToken returns the token used for interactions with remote m3em agents
+	SessionToken() string
+
+	// SetSessionOverride sets a flag indicating if m3em agent operations
+	// are permitted to override clashing resources
+	SetSessionOverride(bool) Options
+
+	// SessionOverride returns a flag indicating if m3em agent operations
+	// are permitted to override clashing resources
+	SessionOverride() bool
+
 	// SetReplication sets the replication factor for the cluster
 	SetReplication(int) Options
 

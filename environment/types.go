@@ -209,20 +209,6 @@ type Options interface {
 	// InstrumentOptions returns the instrumentation options
 	InstrumentOptions() instrument.Options
 
-	// SetSessionToken sets the token used for interactions with remote m3em agents
-	SetSessionToken(string) Options
-
-	// SessionToken returns the token used for interactions with remote m3em agents
-	SessionToken() string
-
-	// SetSessionOverride sets a flag indicating if m3em agent operations
-	// are permitted to override clashing resources
-	SetSessionOverride(bool) Options
-
-	// SessionOverride returns a flag indicating if m3em agent operations
-	// are permitted to override clashing resources
-	SessionOverride() bool
-
 	// TODO(prateek-ref): migrate to ClusterOptions
 	// // SetListener sets the M3DBInstanceListener
 	// SetListener(M3DBInstanceListener) Options
@@ -279,6 +265,8 @@ type NodeOptions interface {
 }
 
 // OperatorClientFn returns a function able to construct connections to remote Operators
+// TODO(prateek-ref): make this take an input identifier for the node being operated upon
+// TODO(prateek-ref): default connection timeout was 2mins
 type OperatorClientFn func() (*grpc.ClientConn, m3em.OperatorClient, error)
 
 // HeartbeatOptions are the knobs to control heartbeating behavior

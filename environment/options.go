@@ -21,20 +21,12 @@
 package environment
 
 import (
-	"fmt"
-
 	"github.com/m3db/m3x/instrument"
 )
 
-const (
-	defaultSessionOverride = false
-)
-
 type opts struct {
-	iopts           instrument.Options
-	sessionOverride bool
-	token           string
-	nodeOpts        NodeOptions
+	iopts    instrument.Options
+	nodeOpts NodeOptions
 }
 
 // NewOptions returns a new Options object
@@ -43,16 +35,12 @@ func NewOptions(iopts instrument.Options) Options {
 		iopts = instrument.NewOptions()
 	}
 	return &opts{
-		iopts:           iopts,
-		sessionOverride: defaultSessionOverride,
-		nodeOpts:        NewNodeOptions(iopts),
+		iopts:    iopts,
+		nodeOpts: NewNodeOptions(iopts),
 	}
 }
 
 func (o opts) Validate() error {
-	if o.token == "" {
-		return fmt.Errorf("no session token set")
-	}
 	return o.nodeOpts.Validate()
 }
 
@@ -63,24 +51,6 @@ func (o opts) SetInstrumentOptions(iopts instrument.Options) Options {
 
 func (o opts) InstrumentOptions() instrument.Options {
 	return o.iopts
-}
-
-func (o opts) SetSessionToken(t string) Options {
-	o.token = t
-	return o
-}
-
-func (o opts) SessionToken() string {
-	return o.token
-}
-
-func (o opts) SetSessionOverride(override bool) Options {
-	o.sessionOverride = override
-	return o
-}
-
-func (o opts) SessionOverride() bool {
-	return o.sessionOverride
 }
 
 func (o opts) SetNodeOptions(no NodeOptions) Options {

@@ -36,7 +36,8 @@ import (
 const defaultRandSeed = 1234567890
 
 var (
-	defaultRandomVar = rand.New(rand.NewSource(int64(defaultRandSeed)))
+	defaultRandomVar        = rand.New(rand.NewSource(int64(defaultRandSeed)))
+	defaultTestSessionToken = "someLongString"
 )
 
 func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.PlacementService) Options {
@@ -46,7 +47,8 @@ func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.Placeme
 		SetNumShards(10).
 		SetReplication(10).
 		SetServiceBuild(mockBuild).
-		SetServiceConfig(mockConf)
+		SetServiceConfig(mockConf).
+		SetSessionToken(defaultTestSessionToken)
 }
 
 func newMockEnvironment(ctrl *gomock.Controller, instances env.M3DBInstances) env.M3DBEnvironment {
@@ -79,7 +81,7 @@ func addDefaultStatusExpects(instances []env.M3DBInstance, calls expectInstanceC
 	for _, inst := range instances {
 		mInst := inst.(*env.MockM3DBInstance)
 		if calls.expectSetup {
-			mInst.EXPECT().Setup(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
+			mInst.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 		}
 		if calls.expectReset {
 			mInst.EXPECT().Reset().AnyTimes().Return(nil)
@@ -376,7 +378,7 @@ func TestClusterSetup(t *testing.T) {
 	)
 	for _, inst := range instances {
 		mi := inst.(*env.MockM3DBInstance)
-		mi.EXPECT().Setup(gomock.Any(), gomock.Any()).Return(nil)
+		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
 	cluster, err := New(mockEnv, opts)
@@ -400,7 +402,7 @@ func TestClusterInitialize(t *testing.T) {
 	)
 	for _, inst := range instances {
 		mi := inst.(*env.MockM3DBInstance)
-		mi.EXPECT().Setup(gomock.Any(), gomock.Any()).Return(nil)
+		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
 	cluster, err := New(mockEnv, opts)

@@ -130,16 +130,18 @@ func (c *m3dbCluster) Setup() error {
 	}
 
 	var (
-		svcBuild  = c.copts.ServiceBuild()
-		svcConf   = c.copts.ServiceConfig()
-		lock      sync.Mutex
-		instances = c.env.Instances()
-		multiErr  xerrors.MultiError
+		svcBuild        = c.copts.ServiceBuild()
+		svcConf         = c.copts.ServiceConfig()
+		sessionToken    = c.copts.SessionToken()
+		sessionOverride = c.copts.SessionOverride()
+		lock            sync.Mutex
+		instances       = c.env.Instances()
+		multiErr        xerrors.MultiError
 	)
 
 	// setup the instances, in parallel
 	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
-		if err := inst.Setup(svcBuild, svcConf); err != nil {
+		if err := inst.Setup(svcBuild, svcConf, sessionToken, sessionOverride); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
 			lock.Unlock()

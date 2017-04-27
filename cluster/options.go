@@ -30,20 +30,23 @@ import (
 )
 
 var (
-	defaultReplication = 3
-	defaultConcurrency = 10
-	defaultNumShards   = 1024
+	defaultSessionOverride = false
+	defaultReplication     = 3
+	defaultConcurrency     = 10
+	defaultNumShards       = 1024
 )
 
 type m3dbClusterOpts struct {
-	iopts        instrument.Options
-	svcBuild     build.ServiceBuild
-	svcConf      build.ServiceConfiguration
-	placementSvc services.PlacementService
-	maxInstances int
-	replication  int
-	numShards    int
-	concurrency  int
+	iopts           instrument.Options
+	sessionOverride bool
+	token           string
+	svcBuild        build.ServiceBuild
+	svcConf         build.ServiceConfiguration
+	placementSvc    services.PlacementService
+	maxInstances    int
+	replication     int
+	numShards       int
+	concurrency     int
 }
 
 // NewOptions returns a new Options object
@@ -55,15 +58,20 @@ func NewOptions(
 		iopts = instrument.NewOptions()
 	}
 	return m3dbClusterOpts{
-		iopts:        iopts,
-		placementSvc: placementSvc,
-		replication:  defaultReplication,
-		numShards:    defaultNumShards,
-		concurrency:  defaultConcurrency,
+		iopts:           iopts,
+		sessionOverride: defaultSessionOverride,
+		placementSvc:    placementSvc,
+		replication:     defaultReplication,
+		numShards:       defaultNumShards,
+		concurrency:     defaultConcurrency,
 	}
 }
 
 func (o m3dbClusterOpts) Validate() error {
+	if o.token == "" {
+		return fmt.Errorf("no session token set")
+	}
+
 	if o.svcBuild == nil {
 		return fmt.Errorf("ServiceBuild is not set")
 	}
@@ -104,6 +112,24 @@ func (o m3dbClusterOpts) SetServiceConfig(c build.ServiceConfiguration) Options 
 
 func (o m3dbClusterOpts) ServiceConfig() build.ServiceConfiguration {
 	return o.svcConf
+}
+
+func (o m3dbClusterOpts) SetSessionToken(t string) Options {
+	o.token = t
+	return o
+}
+
+func (o m3dbClusterOpts) SessionToken() string {
+	return o.token
+}
+
+func (o m3dbClusterOpts) SetSessionOverride(override bool) Options {
+	o.sessionOverride = override
+	return o
+}
+
+func (o m3dbClusterOpts) SessionOverride() bool {
+	return o.sessionOverride
 }
 
 func (o m3dbClusterOpts) SetReplication(r int) Options {
