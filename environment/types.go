@@ -120,14 +120,17 @@ type M3DBInstance interface {
 	// Reset sets the ServiceInstance back to the state after Setup was called.
 	Reset() error
 
-	// Teardown releases any resources used for testing.
+	// Teardown releases any remote resources used for testing.
 	Teardown() error
 
-	// TODO(prateek-ref): implement listeners
-	// // RegisterListener registers an event listener
-	// RegisterListener(Listener) ListenerID
-	// // DeregisterListener un-registers an event listener
-	// DeregisterListener(ListenerID)
+	// Close releases any locally held resources
+	Close() error
+
+	// RegisterListener registers an event listener
+	RegisterListener(Listener) ListenerID
+
+	// DeregisterListener un-registers an event listener
+	DeregisterListener(ListenerID)
 
 	// Health returns the health for this ServiceInstance
 	Health() (M3DBInstanceHealth, error)
@@ -163,20 +166,6 @@ type ListenerID int
 
 // Listener provides callbacks invoked upon remote process state transitions
 type Listener interface {
-	// OnProcessTerminate is invoked when the remote process being run terminates
-	OnProcessTerminate(desc string)
-
-	// OnHeartbeatTimeout is invoked upon remote heartbeats having timed-out
-	OnHeartbeatTimeout(lastHeartbeatTs time.Time)
-
-	// OnOverwrite is invoked if remote agent control is overwritten by another
-	// coordinator
-	OnOverwrite(desc string)
-}
-
-// M3DBInstanceListener provides callbacks to be notified of events on the
-// remote instance
-type M3DBInstanceListener interface {
 	// OnProcessTerminate is invoked when the remote process being run terminates
 	OnProcessTerminate(inst M3DBInstance, desc string)
 

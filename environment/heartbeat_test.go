@@ -45,9 +45,9 @@ func newTestHeartbeatOpts() HeartbeatOptions {
 
 func newTestListener(t *testing.T) *listener {
 	return &listener{
-		onProcessTerminate: func(desc string) { require.Fail(t, "onProcessTerminate invoked %s", desc) },
-		onHeartbeatTimeout: func(ts time.Time) { require.Fail(t, "onHeartbeatTimeout invoked %s", ts.String()) },
-		onOverwrite:        func(desc string) { require.Fail(t, "onOverwrite invoked %s", desc) },
+		onProcessTerminate: func(_ M3DBInstance, desc string) { require.Fail(t, "onProcessTerminate invoked %s", desc) },
+		onHeartbeatTimeout: func(_ M3DBInstance, ts time.Time) { require.Fail(t, "onHeartbeatTimeout invoked %s", ts.String()) },
+		onOverwrite:        func(_ M3DBInstance, desc string) { require.Fail(t, "onOverwrite invoked %s", desc) },
 	}
 }
 
@@ -100,7 +100,7 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 		processTerminated = false
 		lnr               = newTestListener(t)
 	)
-	lnr.onProcessTerminate = func(string) {
+	lnr.onProcessTerminate = func(M3DBInstance, string) {
 		lock.Lock()
 		processTerminated = true
 		lock.Unlock()
@@ -134,7 +134,7 @@ func TestHeartbeatingOverwrite(t *testing.T) {
 		overwritten = false
 		lnr         = newTestListener(t)
 	)
-	lnr.onOverwrite = func(string) {
+	lnr.onOverwrite = func(M3DBInstance, string) {
 		lock.Lock()
 		overwritten = true
 		lock.Unlock()
@@ -177,7 +177,7 @@ func TestHeartbeatingTimeout(t *testing.T) {
 		timedout = false
 		lnr      = newTestListener(t)
 	)
-	lnr.onHeartbeatTimeout = func(ts time.Time) {
+	lnr.onHeartbeatTimeout = func(_ M3DBInstance, ts time.Time) {
 		lock.Lock()
 		timedout = true
 		lock.Unlock()
@@ -213,7 +213,7 @@ func TestHeartbeatRouterValidRoute(t *testing.T) {
 		overwritten = false
 		lnr         = newTestListener(t)
 	)
-	lnr.onOverwrite = func(string) {
+	lnr.onOverwrite = func(M3DBInstance, string) {
 		lock.Lock()
 		overwritten = true
 		lock.Unlock()

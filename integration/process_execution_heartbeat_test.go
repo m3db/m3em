@@ -32,11 +32,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m3db/m3cluster/services/placement"
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
+	"github.com/m3db/m3em/environment"
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
-	"github.com/m3db/m3em/operator"
 
 	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
@@ -73,7 +74,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	defer server.GracefulStop()
 
 	// create new heartbeat router
-	hbRouter := operator.NewHeartbeatRouter(heartbeatListener.Addr().String())
+	hbRouter := environment.NewHeartbeatRouter(heartbeatListener.Addr().String())
 	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
 	hb.RegisterHeartbeaterServer(hbServer, hbRouter)
 	go func() {
@@ -82,35 +83,37 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	defer hbServer.GracefulStop()
 
 	// create operator to communicate with agent
-	hbOpts := operator.NewHeartbeatOptions().
+	hbOpts := environment.NewHeartbeatOptions().
 		SetEnabled(true).
 		SetHeartbeatRouter(hbRouter)
-	oOpts := operator.NewOptions(iopts).
-		SetHeartbeatOptions(hbOpts)
-	op, err := operator.New(agentListener.Addr().String(), oOpts)
+	nodeOpts := environment.NewNodeOptions(iopts).
+		SetHeartbeatOptions(hbOpts).
+		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
+	svc := placement.NewInstance()
+	node, err := environment.NewM3DBInstance(svc, nodeOpts)
 	require.NoError(t, err)
-
+	defer node.Close()
 	// capture notifications from operator
 	var (
 		lock                sync.Mutex
 		notifiedTermination = false
 	)
-	operatorEventListener := operator.NewListener(
-		func(s string) {
+	eventListener := environment.NewListener(
+		func(_ environment.M3DBInstance, s string) {
 			require.False(t, notifiedTermination)
 			lock.Lock()
 			notifiedTermination = true
 			lock.Unlock()
 		},
-		func(ts time.Time) {
+		func(_ environment.M3DBInstance, ts time.Time) {
 			require.FailNow(t, "received timeout: %v", ts.String())
 		},
-		func(s string) {
+		func(_ environment.M3DBInstance, s string) {
 			require.FailNow(t, "received overwrite: %v", s)
 		},
 	)
-	id := op.RegisterListener(operatorEventListener)
-	defer op.DeregisterListener(id)
+	id := node.RegisterListener(eventListener)
+	defer node.DeregisterListener(id)
 
 	// create test build
 	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
@@ -123,11 +126,11 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	testConfig := build.NewM3DBConfig(testConfigID, confContents)
 
 	// get the files transferred over
-	err = op.Setup(testBinary, testConfig, "tok", false)
+	err = node.Setup(testBinary, testConfig, "tok", false)
 	require.NoError(t, err)
 
 	// execute the build
-	require.NoError(t, op.Start())
+	require.NoError(t, node.Start())
 	stopped := waitUntilAgentFinished(agentService, time.Second)
 	require.True(t, stopped)
 

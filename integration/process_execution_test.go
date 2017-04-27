@@ -31,10 +31,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m3db/m3cluster/services/placement"
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
+	"github.com/m3db/m3em/environment"
 	"github.com/m3db/m3em/generated/proto/m3em"
-	"github.com/m3db/m3em/operator"
 
 	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
@@ -65,9 +66,12 @@ func TestProcessExecution(t *testing.T) {
 	defer server.GracefulStop()
 
 	// create operator to communicate with agent
-	oOpts := operator.NewOptions(iopts)
-	op, err := operator.New(l.Addr().String(), oOpts)
+	nodeOpts := environment.NewNodeOptions(iopts).
+		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
+	svc := placement.NewInstance()
+	node, err := environment.NewM3DBInstance(svc, nodeOpts)
 	require.NoError(t, err)
+	defer node.Close()
 
 	// create test build
 	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
@@ -80,11 +84,11 @@ func TestProcessExecution(t *testing.T) {
 	testConfig := build.NewM3DBConfig(testConfigID, confContents)
 
 	// get the files transferred over
-	err = op.Setup(testBinary, testConfig, "tok", false)
+	err = node.Setup(testBinary, testConfig, "tok", false)
 	require.NoError(t, err)
 
 	// execute the build
-	require.NoError(t, op.Start())
+	require.NoError(t, node.Start())
 	stopped := waitUntilAgentFinished(agentService, time.Second)
 	require.True(t, stopped)
 

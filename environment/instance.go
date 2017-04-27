@@ -384,7 +384,7 @@ func (i *m3dbInst) Teardown() error {
 		return err
 	}
 
-	if err := i.close(); err != nil {
+	if err := i.Close(); err != nil {
 		return err
 	}
 
@@ -392,7 +392,7 @@ func (i *m3dbInst) Teardown() error {
 	return nil
 }
 
-func (i *m3dbInst) close() error {
+func (i *m3dbInst) Close() error {
 	if conn := i.clientConn; conn != nil {
 		i.clientConn = nil
 		return conn.Close()
@@ -444,13 +444,13 @@ func (i *m3dbInst) Status() InstanceStatus {
 	return i.status
 }
 
-// TODO(prateek-ref): implement these for m3dbInst
-// func (i *m3dbInst) RegisterListener(l Listener) ListenerID {
-// 	return ListenerID(i.listeners.add(l))
-// }
-// func (i *m3dbInst) DeregisterListener(token ListenerID) {
-// 	i.listeners.remove(int(token))
-// }
+func (i *m3dbInst) RegisterListener(l Listener) ListenerID {
+	return ListenerID(i.listeners.add(l))
+}
+
+func (i *m3dbInst) DeregisterListener(token ListenerID) {
+	i.listeners.remove(int(token))
+}
 
 func (i *m3dbInst) thriftClient() (m3dbrpc.TChanNode, error) {
 	i.Lock()

@@ -30,7 +30,11 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/m3db/m3em/agent"
+	"github.com/m3db/m3em/environment"
+	"github.com/m3db/m3em/generated/proto/m3em"
 
 	"github.com/stretchr/testify/require"
 )
@@ -136,4 +140,14 @@ func waitUntilAgentFinished(a agent.Agent, timeout time.Duration) bool {
 		time.Sleep(10 * time.Millisecond)
 	}
 	return stopped
+}
+
+func testOperatorClientFn(endpoint string) environment.OperatorClientFn {
+	return func() (*grpc.ClientConn, m3em.OperatorClient, error) {
+		conn, err := grpc.Dial(endpoint, grpc.WithTimeout(10*time.Second), grpc.WithInsecure())
+		if err != nil {
+			return nil, nil, err
+		}
+		return conn, m3em.NewOperatorClient(conn), err
+	}
 }

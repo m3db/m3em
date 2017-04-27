@@ -7,9 +7,9 @@ import (
 
 // NewListener creates a new listener
 func NewListener(
-	onProcessTerminate func(string),
-	onHeartbeatTimeout func(last time.Time),
-	onOverwrite func(string),
+	onProcessTerminate func(M3DBInstance, string),
+	onHeartbeatTimeout func(M3DBInstance, time.Time),
+	onOverwrite func(M3DBInstance, string),
 ) Listener {
 	return &listener{
 		onProcessTerminate: onProcessTerminate,
@@ -19,26 +19,26 @@ func NewListener(
 }
 
 type listener struct {
-	onProcessTerminate func(string)
-	onHeartbeatTimeout func(last time.Time)
-	onOverwrite        func(string)
+	onProcessTerminate func(M3DBInstance, string)
+	onHeartbeatTimeout func(M3DBInstance, time.Time)
+	onOverwrite        func(M3DBInstance, string)
 }
 
-func (l *listener) OnProcessTerminate(desc string) {
+func (l *listener) OnProcessTerminate(node M3DBInstance, desc string) {
 	if l.onProcessTerminate != nil {
-		l.onProcessTerminate(desc)
+		l.onProcessTerminate(node, desc)
 	}
 }
 
-func (l *listener) OnHeartbeatTimeout(lastHeartbeatTs time.Time) {
+func (l *listener) OnHeartbeatTimeout(node M3DBInstance, lastHeartbeatTs time.Time) {
 	if l.onHeartbeatTimeout != nil {
-		l.onHeartbeatTimeout(lastHeartbeatTs)
+		l.onHeartbeatTimeout(node, lastHeartbeatTs)
 	}
 }
 
-func (l *listener) OnOverwrite(desc string) {
+func (l *listener) OnOverwrite(node M3DBInstance, desc string) {
 	if l.onOverwrite != nil {
-		l.onOverwrite(desc)
+		l.onOverwrite(node, desc)
 	}
 }
 
@@ -68,26 +68,26 @@ func (lg *listenerGroup) remove(t int) {
 	delete(lg.elems, t)
 }
 
-func (lg *listenerGroup) notifyTimeout(lastTs time.Time) {
+func (lg *listenerGroup) notifyTimeout(node M3DBInstance, lastTs time.Time) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
-		go l.OnHeartbeatTimeout(lastTs)
+		go l.OnHeartbeatTimeout(node, lastTs)
 	}
 }
 
-func (lg *listenerGroup) notifyTermination(desc string) {
+func (lg *listenerGroup) notifyTermination(node M3DBInstance, desc string) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
-		go l.OnProcessTerminate(desc)
+		go l.OnProcessTerminate(node, desc)
 	}
 }
 
-func (lg *listenerGroup) notifyOverwrite(desc string) {
+func (lg *listenerGroup) notifyOverwrite(node M3DBInstance, desc string) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
-		go l.OnOverwrite(desc)
+		go l.OnOverwrite(node, desc)
 	}
 }

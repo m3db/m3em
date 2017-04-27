@@ -266,6 +266,46 @@ func (_mr *_MockOptionsRecorder) ServiceConfig() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ServiceConfig")
 }
 
+func (_m *MockOptions) SetSessionToken(_param0 string) Options {
+	ret := _m.ctrl.Call(_m, "SetSessionToken", _param0)
+	ret0, _ := ret[0].(Options)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SetSessionToken(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetSessionToken", arg0)
+}
+
+func (_m *MockOptions) SessionToken() string {
+	ret := _m.ctrl.Call(_m, "SessionToken")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SessionToken() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SessionToken")
+}
+
+func (_m *MockOptions) SetSessionOverride(_param0 bool) Options {
+	ret := _m.ctrl.Call(_m, "SetSessionOverride", _param0)
+	ret0, _ := ret[0].(Options)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SetSessionOverride(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetSessionOverride", arg0)
+}
+
+func (_m *MockOptions) SessionOverride() bool {
+	ret := _m.ctrl.Call(_m, "SessionOverride")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+func (_mr *_MockOptionsRecorder) SessionOverride() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SessionOverride")
+}
+
 func (_m *MockOptions) SetReplication(_param0 int) Options {
 	ret := _m.ctrl.Call(_m, "SetReplication", _param0)
 	ret0, _ := ret[0].(Options)

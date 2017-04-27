@@ -29,10 +29,11 @@ import (
 	"path"
 	"testing"
 
+	"github.com/m3db/m3cluster/services/placement"
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
+	"github.com/m3db/m3em/environment"
 	"github.com/m3db/m3em/generated/proto/m3em"
-	"github.com/m3db/m3em/operator"
 
 	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
@@ -63,9 +64,12 @@ func TestLargeFileTransfer(t *testing.T) {
 	defer server.GracefulStop()
 
 	// create operator to communicate with agent
-	oOpts := operator.NewOptions(iopts)
-	op, err := operator.New(l.Addr().String(), oOpts)
+	nodeOpts := environment.NewNodeOptions(iopts).
+		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
+	svc := placement.NewInstance()
+	node, err := environment.NewM3DBInstance(svc, nodeOpts)
 	require.NoError(t, err)
+	defer node.Close()
 
 	// create test build
 	largeTestFileSize := int64(1024 * 1024 * 100) /* 100 MB */
@@ -81,7 +85,7 @@ func TestLargeFileTransfer(t *testing.T) {
 	targetConfigFile := path.Join(targetLocation, testConfigID)
 	testConfig := build.NewM3DBConfig(testConfigID, confContents)
 
-	err = op.Setup(testBinary, testConfig, "tok", false)
+	err = node.Setup(testBinary, testConfig, "tok", false)
 	require.NoError(t, err)
 
 	// test copied build file contents
