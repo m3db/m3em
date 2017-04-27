@@ -51,7 +51,7 @@ var (
 	errUnableToOverrideConf             = fmt.Errorf("unable to override instance configuration, it must be setup")
 )
 
-type m3dbInst struct {
+type svcNode struct {
 	sync.Mutex
 	logger            xlog.Logger
 	opts              NodeOptions
@@ -109,7 +109,7 @@ func NewM3DBInstance(
 		}
 	}
 
-	retInst := &m3dbInst{
+	retInst := &svcNode{
 		logger:            opts.InstrumentOptions().Logger(),
 		opts:              opts,
 		id:                inst.ID(),
@@ -129,7 +129,7 @@ func NewM3DBInstance(
 	return retInst, nil
 }
 
-func (i *m3dbInst) String() string {
+func (i *svcNode) String() string {
 	i.Lock()
 	defer i.Unlock()
 	return fmt.Sprintf(
@@ -138,85 +138,85 @@ func (i *m3dbInst) String() string {
 	)
 }
 
-func (i *m3dbInst) ID() string {
+func (i *svcNode) ID() string {
 	i.Lock()
 	defer i.Unlock()
 	return i.id
 }
 
-func (i *m3dbInst) SetID(id string) services.PlacementInstance {
+func (i *svcNode) SetID(id string) services.PlacementInstance {
 	i.Lock()
 	defer i.Unlock()
 	i.id = id
 	return i
 }
 
-func (i *m3dbInst) Rack() string {
+func (i *svcNode) Rack() string {
 	i.Lock()
 	defer i.Unlock()
 	return i.rack
 }
 
-func (i *m3dbInst) SetRack(r string) services.PlacementInstance {
+func (i *svcNode) SetRack(r string) services.PlacementInstance {
 	i.Lock()
 	defer i.Unlock()
 	i.rack = r
 	return i
 }
 
-func (i *m3dbInst) Zone() string {
+func (i *svcNode) Zone() string {
 	i.Lock()
 	defer i.Unlock()
 	return i.zone
 }
 
-func (i *m3dbInst) SetZone(z string) services.PlacementInstance {
+func (i *svcNode) SetZone(z string) services.PlacementInstance {
 	i.Lock()
 	defer i.Unlock()
 	i.zone = z
 	return i
 }
 
-func (i *m3dbInst) Weight() uint32 {
+func (i *svcNode) Weight() uint32 {
 	i.Lock()
 	defer i.Unlock()
 	return i.weight
 }
 
-func (i *m3dbInst) SetWeight(w uint32) services.PlacementInstance {
+func (i *svcNode) SetWeight(w uint32) services.PlacementInstance {
 	i.Lock()
 	defer i.Unlock()
 	i.weight = w
 	return i
 }
 
-func (i *m3dbInst) Endpoint() string {
+func (i *svcNode) Endpoint() string {
 	i.Lock()
 	defer i.Unlock()
 	return i.endpoint
 }
 
-func (i *m3dbInst) SetEndpoint(ip string) services.PlacementInstance {
+func (i *svcNode) SetEndpoint(ip string) services.PlacementInstance {
 	i.Lock()
 	defer i.Unlock()
 	i.endpoint = ip
 	return i
 }
 
-func (i *m3dbInst) Shards() shard.Shards {
+func (i *svcNode) Shards() shard.Shards {
 	i.Lock()
 	defer i.Unlock()
 	return i.shards
 }
 
-func (i *m3dbInst) SetShards(s shard.Shards) services.PlacementInstance {
+func (i *svcNode) SetShards(s shard.Shards) services.PlacementInstance {
 	i.Lock()
 	defer i.Unlock()
 	i.shards = s
 	return i
 }
 
-func (i *m3dbInst) Setup(
+func (i *svcNode) Setup(
 	bld build.ServiceBuild,
 	conf build.ServiceConfiguration,
 	token string,
@@ -284,11 +284,11 @@ func (i *m3dbInst) Setup(
 	return nil
 }
 
-func (i *m3dbInst) heartbeatReceived() bool {
+func (i *svcNode) heartbeatReceived() bool {
 	return !i.heartbeater.lastHeartbeatTime().IsZero()
 }
 
-func (i *m3dbInst) sendFile(
+func (i *svcNode) sendFile(
 	file build.IterableBytesWithID,
 	fileType m3em.FileType,
 	overwrite bool,
@@ -342,7 +342,7 @@ func (i *m3dbInst) sendFile(
 	return nil
 }
 
-func (i *m3dbInst) Teardown() error {
+func (i *svcNode) Teardown() error {
 	i.Lock()
 	defer i.Unlock()
 	if status := i.status; status != InstanceStatusRunning &&
@@ -370,7 +370,7 @@ func (i *m3dbInst) Teardown() error {
 	return nil
 }
 
-func (i *m3dbInst) Close() error {
+func (i *svcNode) Close() error {
 	var err xerrors.MultiError
 
 	if conn := i.clientConn; conn != nil {
@@ -388,7 +388,7 @@ func (i *m3dbInst) Close() error {
 	return err.FinalError()
 }
 
-func (i *m3dbInst) Start() error {
+func (i *svcNode) Start() error {
 	i.Lock()
 	defer i.Unlock()
 	if i.status != InstanceStatusSetup {
@@ -407,7 +407,7 @@ func (i *m3dbInst) Start() error {
 	return nil
 }
 
-func (i *m3dbInst) Stop() error {
+func (i *svcNode) Stop() error {
 	i.Lock()
 	defer i.Unlock()
 	if i.status != InstanceStatusRunning {
@@ -426,21 +426,21 @@ func (i *m3dbInst) Stop() error {
 	return nil
 }
 
-func (i *m3dbInst) Status() InstanceStatus {
+func (i *svcNode) Status() InstanceStatus {
 	i.Lock()
 	defer i.Unlock()
 	return i.status
 }
 
-func (i *m3dbInst) RegisterListener(l Listener) ListenerID {
+func (i *svcNode) RegisterListener(l Listener) ListenerID {
 	return ListenerID(i.listeners.add(l))
 }
 
-func (i *m3dbInst) DeregisterListener(token ListenerID) {
+func (i *svcNode) DeregisterListener(token ListenerID) {
 	i.listeners.remove(int(token))
 }
 
-func (i *m3dbInst) thriftClient() (m3dbrpc.TChanNode, error) {
+func (i *svcNode) thriftClient() (m3dbrpc.TChanNode, error) {
 	i.Lock()
 	defer i.Unlock()
 	if i.m3dbClient != nil {
@@ -457,7 +457,7 @@ func (i *m3dbInst) thriftClient() (m3dbrpc.TChanNode, error) {
 	return i.m3dbClient, nil
 }
 
-func (i *m3dbInst) Health() (M3DBInstanceHealth, error) {
+func (i *svcNode) Health() (M3DBInstanceHealth, error) {
 	healthResult := M3DBInstanceHealth{}
 
 	client, err := i.thriftClient()
