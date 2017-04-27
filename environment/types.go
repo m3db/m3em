@@ -117,9 +117,6 @@ type M3DBInstance interface {
 	// Status returns the ServiceInstance status.
 	Status() InstanceStatus
 
-	// Reset sets the ServiceInstance back to the state after Setup was called.
-	Reset() error
-
 	// Teardown releases any remote resources used for testing.
 	Teardown() error
 

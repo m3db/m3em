@@ -35,6 +35,7 @@ import (
 	"github.com/m3db/m3cluster/shard"
 	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	m3dbchannel "github.com/m3db/m3db/network/server/tchannelthrift/node/channel"
+	xerrors "github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 	gu "github.com/nu7hatch/gouuid"
 	tchannel "github.com/uber/tchannel-go"
@@ -341,20 +342,6 @@ func (i *m3dbInst) sendFile(
 	return nil
 }
 
-func (i *m3dbInst) Reset() error {
-	i.Lock()
-	defer i.Unlock()
-	if status := i.status; status != InstanceStatusRunning &&
-		status != InstanceStatusSetup && status != InstanceStatusError {
-		return errUnableToResetInstance
-	}
-
-	// TODO(prateek-ref): implement client.Reset interactions
-
-	i.status = InstanceStatusSetup
-	return nil
-}
-
 func (i *m3dbInst) Teardown() error {
 	i.Lock()
 	defer i.Unlock()
@@ -364,17 +351,8 @@ func (i *m3dbInst) Teardown() error {
 		return errUnableToTeardownInstance
 	}
 
-	// Stop heartbeating
-	if hbServer := i.heartbeater; hbServer != nil {
-		hbServer.stop()
-		i.heartbeater = nil
-	}
-
-	// TODO(prateek-ref): deregister any listeners
-	// if i.opListener != nil {
-	// 	i.operator.DeregisterListener(i.opListenerID)
-	// 	i.opListener = nil
-	// }
+	// clear any listeners
+	i.listeners.clear()
 
 	if err := i.opts.Retrier().Attempt(func() error {
 		ctx := context.Background()
@@ -393,11 +371,21 @@ func (i *m3dbInst) Teardown() error {
 }
 
 func (i *m3dbInst) Close() error {
+	var err xerrors.MultiError
+
 	if conn := i.clientConn; conn != nil {
 		i.clientConn = nil
-		return conn.Close()
+		err = err.Add(conn.Close())
 	}
-	return nil
+
+	if hbServer := i.heartbeater; hbServer != nil {
+		hbServer.stop()
+		err = err.Add(i.opts.HeartbeatOptions().HeartbeatRouter().Deregister(i.operatorUUID))
+		i.heartbeater = nil
+		i.operatorUUID = ""
+	}
+
+	return err.FinalError()
 }
 
 func (i *m3dbInst) Start() error {

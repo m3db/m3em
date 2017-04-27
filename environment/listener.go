@@ -62,6 +62,14 @@ func (lg *listenerGroup) add(l Listener) int {
 	return lg.token
 }
 
+func (lg *listenerGroup) clear() {
+	lg.Lock()
+	defer lg.Unlock()
+	for i := range lg.elems {
+		delete(lg.elems, i)
+	}
+}
+
 func (lg *listenerGroup) remove(t int) {
 	lg.Lock()
 	defer lg.Unlock()
