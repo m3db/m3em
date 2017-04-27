@@ -27,12 +27,9 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	build "github.com/m3db/m3em/build"
 
-	operator "github.com/m3db/m3em/operator"
 	services "github.com/m3db/m3cluster/services"
 	shard "github.com/m3db/m3cluster/shard"
 	instrument "github.com/m3db/m3x/instrument"
-	retry "github.com/m3db/m3x/retry"
-	time "time"
 )
 
 // Mock of M3DBInstance interface
@@ -85,26 +82,6 @@ func (_m *MockM3DBInstance) ID() string {
 
 func (_mr *_MockM3DBInstanceRecorder) ID() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ID")
-}
-
-func (_m *MockM3DBInstance) Operator() operator.Operator {
-	ret := _m.ctrl.Call(_m, "Operator")
-	ret0, _ := ret[0].(operator.Operator)
-	return ret0
-}
-
-func (_mr *_MockM3DBInstanceRecorder) Operator() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Operator")
-}
-
-func (_m *MockM3DBInstance) OverrideConfiguration(_param0 build.ServiceConfiguration) error {
-	ret := _m.ctrl.Call(_m, "OverrideConfiguration", _param0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-func (_mr *_MockM3DBInstanceRecorder) OverrideConfiguration(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "OverrideConfiguration", arg0)
 }
 
 func (_m *MockM3DBInstance) Rack() string {
@@ -187,14 +164,14 @@ func (_mr *_MockM3DBInstanceRecorder) SetZone(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetZone", arg0)
 }
 
-func (_m *MockM3DBInstance) Setup(_param0 build.ServiceBuild, _param1 build.ServiceConfiguration) error {
-	ret := _m.ctrl.Call(_m, "Setup", _param0, _param1)
+func (_m *MockM3DBInstance) Setup(_param0 build.ServiceBuild, _param1 build.ServiceConfiguration, _param2 string, _param3 bool) error {
+	ret := _m.ctrl.Call(_m, "Setup", _param0, _param1, _param2, _param3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockM3DBInstanceRecorder) Setup(arg0, arg1 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Setup", arg0, arg1)
+func (_mr *_MockM3DBInstanceRecorder) Setup(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Setup", arg0, arg1, arg2, arg3)
 }
 
 func (_m *MockM3DBInstance) Shards() shard.Shards {
@@ -349,26 +326,6 @@ func (_m *MockOptions) EXPECT() *_MockOptionsRecorder {
 	return _m.recorder
 }
 
-func (_m *MockOptions) InstanceOperationRetrier() retry.Retrier {
-	ret := _m.ctrl.Call(_m, "InstanceOperationRetrier")
-	ret0, _ := ret[0].(retry.Retrier)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) InstanceOperationRetrier() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationRetrier")
-}
-
-func (_m *MockOptions) InstanceOperationTimeout() time.Duration {
-	ret := _m.ctrl.Call(_m, "InstanceOperationTimeout")
-	ret0, _ := ret[0].(time.Duration)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) InstanceOperationTimeout() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstanceOperationTimeout")
-}
-
 func (_m *MockOptions) InstrumentOptions() instrument.Options {
 	ret := _m.ctrl.Call(_m, "InstrumentOptions")
 	ret0, _ := ret[0].(instrument.Options)
@@ -379,24 +336,14 @@ func (_mr *_MockOptionsRecorder) InstrumentOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstrumentOptions")
 }
 
-func (_m *MockOptions) Listener() M3DBInstanceListener {
-	ret := _m.ctrl.Call(_m, "Listener")
-	ret0, _ := ret[0].(M3DBInstanceListener)
+func (_m *MockOptions) NodeOptions() NodeOptions {
+	ret := _m.ctrl.Call(_m, "NodeOptions")
+	ret0, _ := ret[0].(NodeOptions)
 	return ret0
 }
 
-func (_mr *_MockOptionsRecorder) Listener() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Listener")
-}
-
-func (_m *MockOptions) OperatorOptions() operator.Options {
-	ret := _m.ctrl.Call(_m, "OperatorOptions")
-	ret0, _ := ret[0].(operator.Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) OperatorOptions() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "OperatorOptions")
+func (_mr *_MockOptionsRecorder) NodeOptions() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NodeOptions")
 }
 
 func (_m *MockOptions) SessionOverride() bool {
@@ -419,26 +366,6 @@ func (_mr *_MockOptionsRecorder) SessionToken() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SessionToken")
 }
 
-func (_m *MockOptions) SetInstanceOperationRetrier(_param0 retry.Retrier) Options {
-	ret := _m.ctrl.Call(_m, "SetInstanceOperationRetrier", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetInstanceOperationRetrier(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationRetrier", arg0)
-}
-
-func (_m *MockOptions) SetInstanceOperationTimeout(_param0 time.Duration) Options {
-	ret := _m.ctrl.Call(_m, "SetInstanceOperationTimeout", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetInstanceOperationTimeout(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstanceOperationTimeout", arg0)
-}
-
 func (_m *MockOptions) SetInstrumentOptions(_param0 instrument.Options) Options {
 	ret := _m.ctrl.Call(_m, "SetInstrumentOptions", _param0)
 	ret0, _ := ret[0].(Options)
@@ -449,24 +376,14 @@ func (_mr *_MockOptionsRecorder) SetInstrumentOptions(arg0 interface{}) *gomock.
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstrumentOptions", arg0)
 }
 
-func (_m *MockOptions) SetListener(_param0 M3DBInstanceListener) Options {
-	ret := _m.ctrl.Call(_m, "SetListener", _param0)
+func (_m *MockOptions) SetNodeOptions(_param0 NodeOptions) Options {
+	ret := _m.ctrl.Call(_m, "SetNodeOptions", _param0)
 	ret0, _ := ret[0].(Options)
 	return ret0
 }
 
-func (_mr *_MockOptionsRecorder) SetListener(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetListener", arg0)
-}
-
-func (_m *MockOptions) SetOperatorOptions(_param0 operator.Options) Options {
-	ret := _m.ctrl.Call(_m, "SetOperatorOptions", _param0)
-	ret0, _ := ret[0].(Options)
-	return ret0
-}
-
-func (_mr *_MockOptionsRecorder) SetOperatorOptions(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetOperatorOptions", arg0)
+func (_mr *_MockOptionsRecorder) SetNodeOptions(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetNodeOptions", arg0)
 }
 
 func (_m *MockOptions) SetSessionOverride(_param0 bool) Options {

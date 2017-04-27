@@ -21,17 +21,22 @@
 package environment
 
 import (
+	"context"
 	"fmt"
 	"sync"
-	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/m3db/m3em/build"
-	"github.com/m3db/m3em/operator"
+	"github.com/m3db/m3em/generated/proto/m3em"
+	mtime "github.com/m3db/m3em/time"
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3cluster/shard"
 	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	m3dbchannel "github.com/m3db/m3db/network/server/tchannelthrift/node/channel"
+	"github.com/m3db/m3x/log"
+	gu "github.com/nu7hatch/gouuid"
 	tchannel "github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 )
@@ -47,50 +52,78 @@ var (
 
 type m3dbInst struct {
 	sync.Mutex
-	opts         Options
-	id           string
-	rack         string
-	zone         string
-	weight       uint32
-	endpoint     string
-	shards       shard.Shards
-	status       InstanceStatus
-	currentBuild build.ServiceBuild
-	currentConf  build.ServiceConfiguration
-	operator     operator.Operator
-	opListener   operator.Listener
-	opListenerID operator.ListenerID
-	m3dbClient   m3dbrpc.TChanNode
+	logger            xlog.Logger
+	opts              NodeOptions
+	id                string
+	rack              string
+	zone              string
+	weight            uint32
+	endpoint          string
+	shards            shard.Shards
+	status            InstanceStatus
+	currentBuild      build.ServiceBuild
+	currentConf       build.ServiceConfiguration
+	clientConn        *grpc.ClientConn
+	client            m3em.OperatorClient
+	listeners         *listenerGroup
+	heartbeater       *opHeartbeatServer
+	operatorUUID      string
+	heartbeatEndpoint string
+
+	m3dbClient m3dbrpc.TChanNode
 }
 
 // NewM3DBInstance returns a new M3DBInstance.
 func NewM3DBInstance(
 	inst services.PlacementInstance,
-	op operator.Operator,
-	opts Options,
+	opts NodeOptions,
 ) (M3DBInstance, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	retInst := &m3dbInst{
-		opts:     opts,
-		id:       inst.ID(),
-		rack:     inst.Rack(),
-		zone:     inst.Zone(),
-		weight:   inst.Weight(),
-		endpoint: inst.Endpoint(),
-		shards:   inst.Shards(),
-		status:   InstanceStatusUninitialized,
-		operator: op,
+
+	clientConn, client, err := opts.OperatorClientFn()()
+	if err != nil {
+		return nil, err
 	}
-	if listener := opts.Listener(); listener != nil {
-		opListener := operator.NewListener(
-			func(s string) { listener.OnProcessTerminate(retInst, s) },
-			func(ts time.Time) { listener.OnHeartbeatTimeout(retInst, ts) },
-			func(s string) { listener.OnOverwrite(retInst, s) },
-		)
-		retInst.opListener = opListener
-		retInst.opListenerID = op.RegisterListener(opListener)
+
+	uuid, err := gu.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		listeners      = newListenerGroup()
+		hbUUID         = string(uuid[:])
+		heartbeater    *opHeartbeatServer
+		routerEndpoint string
+	)
+
+	if opts.HeartbeatOptions().Enabled() {
+		router := opts.HeartbeatOptions().HeartbeatRouter()
+		routerEndpoint = router.Endpoint()
+		heartbeater = newHeartbeater(listeners, opts.HeartbeatOptions(), opts.InstrumentOptions())
+		if err := router.Register(hbUUID, heartbeater); err != nil {
+			return nil, fmt.Errorf("unable to register heartbeat server with router: %v", err)
+		}
+	}
+
+	retInst := &m3dbInst{
+		logger:            opts.InstrumentOptions().Logger(),
+		opts:              opts,
+		id:                inst.ID(),
+		rack:              inst.Rack(),
+		zone:              inst.Zone(),
+		weight:            inst.Weight(),
+		endpoint:          inst.Endpoint(),
+		shards:            inst.Shards(),
+		status:            InstanceStatusUninitialized,
+		listeners:         listeners,
+		client:            client,
+		clientConn:        clientConn,
+		heartbeater:       heartbeater,
+		heartbeatEndpoint: routerEndpoint,
+		operatorUUID:      hbUUID,
 	}
 	return retInst, nil
 }
@@ -182,7 +215,12 @@ func (i *m3dbInst) SetShards(s shard.Shards) services.PlacementInstance {
 	return i
 }
 
-func (i *m3dbInst) Setup(b build.ServiceBuild, c build.ServiceConfiguration) error {
+func (i *m3dbInst) Setup(
+	bld build.ServiceBuild,
+	conf build.ServiceConfiguration,
+	token string,
+	force bool,
+) error {
 	i.Lock()
 	defer i.Unlock()
 	if i.status != InstanceStatusUninitialized &&
@@ -190,28 +228,116 @@ func (i *m3dbInst) Setup(b build.ServiceBuild, c build.ServiceConfiguration) err
 		return errUnableToSetupInitializedInstance
 	}
 
-	override := i.opts.SessionOverride()
-	token := i.opts.SessionToken()
-	i.currentConf = c
-	i.currentBuild = b
+	i.currentConf = conf
+	i.currentBuild = bld
 
-	if err := i.operator.Setup(b, c, token, override); err != nil {
+	freq := uint32(i.opts.HeartbeatOptions().Interval().Seconds())
+	err := i.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := i.client.Setup(ctx, &m3em.SetupRequest{
+			OperatorUuid:           i.operatorUUID,
+			SessionToken:           token,
+			Force:                  force,
+			HeartbeatEnabled:       i.opts.HeartbeatOptions().Enabled(),
+			HeartbeatEndpoint:      i.heartbeatEndpoint,
+			HeartbeatFrequencySecs: freq,
+		})
 		return err
+	})
+
+	if err != nil {
+		return fmt.Errorf("unable to setup: %v", err)
+	}
+
+	// TODO(prateek): make heartbeat pickup existing agent state
+
+	// Wait till we receive our first heartbeat
+	if i.opts.HeartbeatOptions().Enabled() {
+		i.logger.Infof("waiting until initial heartbeat is recieved")
+		received := mtime.WaitUntil(i.heartbeatReceived, i.opts.HeartbeatOptions().Timeout())
+		if !received {
+			return fmt.Errorf("did not receive heartbeat response from remote agent within timeout")
+		}
+		i.logger.Infof("initial heartbeat recieved")
+
+		// start hb monitoring
+		if err := i.heartbeater.start(); err != nil {
+			return fmt.Errorf("unable to start heartbeat monitor loop: %v", err)
+		}
+	}
+
+	// transfer build
+	if err := i.opts.Retrier().Attempt(func() error {
+		return i.sendFile(bld, m3em.FileType_M3DB_BINARY, force)
+	}); err != nil {
+		return fmt.Errorf("unable to transfer build: %v", err)
+	}
+
+	if err := i.opts.Retrier().Attempt(func() error {
+		return i.sendFile(conf, m3em.FileType_M3DB_CONFIG, force)
+	}); err != nil {
+		return fmt.Errorf("unable to transfer config: %v", err)
 	}
 
 	i.status = InstanceStatusSetup
 	return nil
 }
 
-func (i *m3dbInst) OverrideConfiguration(conf build.ServiceConfiguration) error {
-	i.Lock()
-	defer i.Unlock()
-	if i.status != InstanceStatusSetup {
-		return errUnableToOverrideConf
+func (i *m3dbInst) heartbeatReceived() bool {
+	return !i.heartbeater.lastHeartbeatTime().IsZero()
+}
+
+func (i *m3dbInst) sendFile(
+	file build.IterableBytesWithID,
+	fileType m3em.FileType,
+	overwrite bool,
+) error {
+	filename := file.ID()
+	iter, err := file.Iter(i.opts.TransferBufferSize())
+	if err != nil {
+		return err
 	}
-	i.currentConf = conf
-	// TODO(prateek): implement operator operations for this path
-	// panic("not implemented")  <- commented out for tests at the moment
+	defer iter.Close()
+
+	ctx := context.Background()
+	stream, err := i.client.Transfer(ctx)
+	if err != nil {
+		return err
+	}
+	chunkIdx := 0
+	for ; iter.Next(); chunkIdx++ {
+		bytes := iter.Current()
+		request := &m3em.TransferRequest{
+			Type:       fileType,
+			Filename:   filename,
+			Overwrite:  overwrite,
+			ChunkBytes: bytes,
+			ChunkIdx:   int32(chunkIdx),
+		}
+		err := stream.Send(request)
+		if err != nil {
+			stream.CloseSend()
+			return err
+		}
+	}
+	if err := iter.Err(); err != nil {
+		stream.CloseSend()
+		return err
+	}
+
+	response, err := stream.CloseAndRecv()
+	if err != nil {
+		return err
+	}
+
+	if int(response.NumChunksRecvd) != chunkIdx {
+		return fmt.Errorf("sent %d chunks, server only received %d of them", chunkIdx, response.NumChunksRecvd)
+	}
+
+	if iter.Checksum() != response.FileChecksum {
+		return fmt.Errorf("expected file checksum: %d, received: %d", iter.Checksum(), response.FileChecksum)
+	}
+
 	return nil
 }
 
@@ -223,9 +349,7 @@ func (i *m3dbInst) Reset() error {
 		return errUnableToResetInstance
 	}
 
-	if err := i.operator.Reset(); err != nil {
-		return err
-	}
+	// TODO(prateek-ref): implement client.Reset interactions
 
 	i.status = InstanceStatusSetup
 	return nil
@@ -240,16 +364,39 @@ func (i *m3dbInst) Teardown() error {
 		return errUnableToTeardownInstance
 	}
 
-	if i.opListener != nil {
-		i.operator.DeregisterListener(i.opListenerID)
-		i.opListener = nil
+	// Stop heartbeating
+	if hbServer := i.heartbeater; hbServer != nil {
+		hbServer.stop()
+		i.heartbeater = nil
 	}
 
-	if err := i.operator.Teardown(); err != nil {
+	// TODO(prateek-ref): deregister any listeners
+	// if i.opListener != nil {
+	// 	i.operator.DeregisterListener(i.opListenerID)
+	// 	i.opListener = nil
+	// }
+
+	if err := i.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := i.client.Teardown(ctx, &m3em.TeardownRequest{})
+		return err
+	}); err != nil {
+		return err
+	}
+
+	if err := i.close(); err != nil {
 		return err
 	}
 
 	i.status = InstanceStatusUninitialized
+	return nil
+}
+
+func (i *m3dbInst) close() error {
+	if conn := i.clientConn; conn != nil {
+		i.clientConn = nil
+		return conn.Close()
+	}
 	return nil
 }
 
@@ -260,7 +407,11 @@ func (i *m3dbInst) Start() error {
 		return errUnableToStartInstance
 	}
 
-	if err := i.operator.Start(); err != nil {
+	if err := i.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := i.client.Start(ctx, &m3em.StartRequest{})
+		return err
+	}); err != nil {
 		return err
 	}
 
@@ -275,7 +426,11 @@ func (i *m3dbInst) Stop() error {
 		return errUnableToStopInstance
 	}
 
-	if err := i.operator.Stop(); err != nil {
+	if err := i.opts.Retrier().Attempt(func() error {
+		ctx := context.Background()
+		_, err := i.client.Stop(ctx, &m3em.StopRequest{})
+		return err
+	}); err != nil {
 		return err
 	}
 
@@ -289,9 +444,13 @@ func (i *m3dbInst) Status() InstanceStatus {
 	return i.status
 }
 
-func (i *m3dbInst) Operator() operator.Operator {
-	return i.operator
-}
+// TODO(prateek-ref): implement these for m3dbInst
+// func (i *m3dbInst) RegisterListener(l Listener) ListenerID {
+// 	return ListenerID(i.listeners.add(l))
+// }
+// func (i *m3dbInst) DeregisterListener(token ListenerID) {
+// 	i.listeners.remove(int(token))
+// }
 
 func (i *m3dbInst) thriftClient() (m3dbrpc.TChanNode, error) {
 	i.Lock()
@@ -319,7 +478,7 @@ func (i *m3dbInst) Health() (M3DBInstanceHealth, error) {
 	}
 
 	attemptFn := func() error {
-		tctx, _ := thrift.NewContext(i.opts.InstanceOperationTimeout())
+		tctx, _ := thrift.NewContext(i.opts.OperationTimeout())
 		result, err := client.Health(tctx)
 		if err != nil {
 			return err
@@ -330,7 +489,7 @@ func (i *m3dbInst) Health() (M3DBInstanceHealth, error) {
 		return nil
 	}
 
-	retrier := i.opts.InstanceOperationRetrier()
+	retrier := i.opts.Retrier()
 	err = retrier.Attempt(attemptFn)
 	return healthResult, err
 }

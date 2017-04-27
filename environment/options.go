@@ -22,27 +22,19 @@ package environment
 
 import (
 	"fmt"
-	"time"
-
-	"github.com/m3db/m3em/operator"
 
 	"github.com/m3db/m3x/instrument"
-	xretry "github.com/m3db/m3x/retry"
 )
 
 const (
-	defaultSessionOverride    = false
-	defaultInstanceOptTimeout = 90 * time.Second
+	defaultSessionOverride = false
 )
 
 type opts struct {
-	iopts             instrument.Options
-	operatorOpts      operator.Options
-	instanceOpRetrier xretry.Retrier
-	instanceOpTimeout time.Duration
-	sessionOverride   bool
-	token             string
-	listener          M3DBInstanceListener
+	iopts           instrument.Options
+	sessionOverride bool
+	token           string
+	nodeOpts        NodeOptions
 }
 
 // NewOptions returns a new Options object
@@ -51,11 +43,9 @@ func NewOptions(iopts instrument.Options) Options {
 		iopts = instrument.NewOptions()
 	}
 	return &opts{
-		iopts:             iopts,
-		instanceOpRetrier: xretry.NewRetrier(xretry.NewOptions()),
-		instanceOpTimeout: defaultInstanceOptTimeout,
-		sessionOverride:   defaultSessionOverride,
-		operatorOpts:      operator.NewOptions(iopts),
+		iopts:           iopts,
+		sessionOverride: defaultSessionOverride,
+		nodeOpts:        NewNodeOptions(iopts),
 	}
 }
 
@@ -63,7 +53,7 @@ func (o opts) Validate() error {
 	if o.token == "" {
 		return fmt.Errorf("no session token set")
 	}
-	return o.operatorOpts.Validate()
+	return o.nodeOpts.Validate()
 }
 
 func (o opts) SetInstrumentOptions(iopts instrument.Options) Options {
@@ -73,33 +63,6 @@ func (o opts) SetInstrumentOptions(iopts instrument.Options) Options {
 
 func (o opts) InstrumentOptions() instrument.Options {
 	return o.iopts
-}
-
-func (o opts) SetInstanceOperationTimeout(td time.Duration) Options {
-	o.instanceOpTimeout = td
-	return o
-}
-
-func (o opts) InstanceOperationTimeout() time.Duration {
-	return o.instanceOpTimeout
-}
-
-func (o opts) SetInstanceOperationRetrier(retrier xretry.Retrier) Options {
-	o.instanceOpRetrier = retrier
-	return o
-}
-
-func (o opts) InstanceOperationRetrier() xretry.Retrier {
-	return o.instanceOpRetrier
-}
-
-func (o opts) SetOperatorOptions(oo operator.Options) Options {
-	o.operatorOpts = oo
-	return o
-}
-
-func (o opts) OperatorOptions() operator.Options {
-	return o.operatorOpts
 }
 
 func (o opts) SetSessionToken(t string) Options {
@@ -120,11 +83,11 @@ func (o opts) SessionOverride() bool {
 	return o.sessionOverride
 }
 
-func (o opts) SetListener(l M3DBInstanceListener) Options {
-	o.listener = l
+func (o opts) SetNodeOptions(no NodeOptions) Options {
+	o.nodeOpts = no
 	return o
 }
 
-func (o opts) Listener() M3DBInstanceListener {
-	return o.listener
+func (o opts) NodeOptions() NodeOptions {
+	return o.nodeOpts
 }

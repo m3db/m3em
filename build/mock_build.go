@@ -25,7 +25,50 @@ package build
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	fs "github.com/m3db/m3em/os/fs"
 )
+
+// Mock of IterableBytesWithID interface
+type MockIterableBytesWithID struct {
+	ctrl     *gomock.Controller
+	recorder *_MockIterableBytesWithIDRecorder
+}
+
+// Recorder for MockIterableBytesWithID (not exported)
+type _MockIterableBytesWithIDRecorder struct {
+	mock *MockIterableBytesWithID
+}
+
+func NewMockIterableBytesWithID(ctrl *gomock.Controller) *MockIterableBytesWithID {
+	mock := &MockIterableBytesWithID{ctrl: ctrl}
+	mock.recorder = &_MockIterableBytesWithIDRecorder{mock}
+	return mock
+}
+
+func (_m *MockIterableBytesWithID) EXPECT() *_MockIterableBytesWithIDRecorder {
+	return _m.recorder
+}
+
+func (_m *MockIterableBytesWithID) ID() string {
+	ret := _m.ctrl.Call(_m, "ID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+func (_mr *_MockIterableBytesWithIDRecorder) ID() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ID")
+}
+
+func (_m *MockIterableBytesWithID) Iter(bufferSize int) (fs.FileReaderIter, error) {
+	ret := _m.ctrl.Call(_m, "Iter", bufferSize)
+	ret0, _ := ret[0].(fs.FileReaderIter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockIterableBytesWithIDRecorder) Iter(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Iter", arg0)
+}
 
 // Mock of ServiceBuild interface
 type MockServiceBuild struct {
@@ -56,6 +99,17 @@ func (_m *MockServiceBuild) ID() string {
 
 func (_mr *_MockServiceBuildRecorder) ID() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ID")
+}
+
+func (_m *MockServiceBuild) Iter(bufferSize int) (fs.FileReaderIter, error) {
+	ret := _m.ctrl.Call(_m, "Iter", bufferSize)
+	ret0, _ := ret[0].(fs.FileReaderIter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockServiceBuildRecorder) Iter(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Iter", arg0)
 }
 
 func (_m *MockServiceBuild) SourcePath() string {
@@ -97,6 +151,17 @@ func (_m *MockServiceConfiguration) ID() string {
 
 func (_mr *_MockServiceConfigurationRecorder) ID() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ID")
+}
+
+func (_m *MockServiceConfiguration) Iter(bufferSize int) (fs.FileReaderIter, error) {
+	ret := _m.ctrl.Call(_m, "Iter", bufferSize)
+	ret0, _ := ret[0].(fs.FileReaderIter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockServiceConfigurationRecorder) Iter(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Iter", arg0)
 }
 
 func (_m *MockServiceConfiguration) MarshalText() ([]byte, error) {

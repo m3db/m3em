@@ -20,6 +20,10 @@
 
 package build
 
+import (
+	"github.com/m3db/m3em/os/fs"
+)
+
 type m3dbBuild struct {
 	id         string
 	sourcePath string
@@ -27,6 +31,10 @@ type m3dbBuild struct {
 
 func (b *m3dbBuild) ID() string {
 	return b.id
+}
+
+func (b *m3dbBuild) Iter(bufferSize int) (fs.FileReaderIter, error) {
+	return fs.NewSizedFileReaderIter(b.sourcePath, bufferSize)
 }
 
 func (b *m3dbBuild) SourcePath() string {
@@ -48,6 +56,14 @@ type m3dbConfig struct {
 
 func (c *m3dbConfig) ID() string {
 	return c.id
+}
+
+func (c *m3dbConfig) Iter(_ int) (fs.FileReaderIter, error) {
+	bytes, err := c.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return fs.NewBytesReaderIter(bytes), nil
 }
 
 func (c *m3dbConfig) MarshalText() ([]byte, error) {

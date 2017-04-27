@@ -18,9 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package operator
+package environment
 
 import (
+	mtime "github.com/m3db/m3em/time"
+
 	"fmt"
 	"time"
 )
@@ -38,7 +40,7 @@ var (
 
 type heartbeatOpts struct {
 	enabled       bool
-	nowFn         NowFn
+	nowFn         mtime.NowFn
 	interval      time.Duration
 	checkInterval time.Duration
 	timeout       time.Duration
@@ -72,12 +74,12 @@ func (ho *heartbeatOpts) Enabled() bool {
 	return ho.enabled
 }
 
-func (ho *heartbeatOpts) SetNowFn(fn NowFn) HeartbeatOptions {
+func (ho *heartbeatOpts) SetNowFn(fn mtime.NowFn) HeartbeatOptions {
 	ho.nowFn = fn
 	return ho
 }
 
-func (ho *heartbeatOpts) NowFn() NowFn {
+func (ho *heartbeatOpts) NowFn() mtime.NowFn {
 	return ho.nowFn
 }
 

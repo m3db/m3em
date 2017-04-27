@@ -19,22 +19,24 @@
 // THE SOFTWARE.
 
 // mockgen rules for generating mocks for unexported interfaces (file mode)
-//go:generate sh -c "mockgen -package=build -destination=$GOPATH/src/$PACKAGE/build/build_mock.go -source=$GOPATH/src/$PACKAGE/build/types.go"
-//go:generate sh -c "mockgen -package=cluster -destination=$GOPATH/src/$PACKAGE/cluster/cluster_mock.go -source=$GOPATH/src/$PACKAGE/cluster/types.go"
+//go:generate sh -c "mockgen -package=build -destination=$GOPATH/src/$PACKAGE/build/mock_build.go -source=$GOPATH/src/$PACKAGE/build/types.go"
+//go:generate sh -c "mockgen -package=cluster -destination=$GOPATH/src/$PACKAGE/cluster/mock_cluster.go -source=$GOPATH/src/$PACKAGE/cluster/types.go"
+//go:generate sh -c "mockgen -package=fs -destination=$GOPATH/src/$PACKAGE/os/fs/mock_fs.go -source=$GOPATH/src/$PACKAGE/os/fs/types.go"
 
 // mockgen rules for generating mocks for exported interfaces (reflection mode). TBH this mode is sketch af.
-// (1) operator package mocks
-//go:generate sh -c "mockgen -package=operator -destination=$GOPATH/src/$PACKAGE/operator/operator_mock.go github.com/m3db/m3em/operator Operator"
-//- mockgen creates a circluar chain by importing the package within itself
-//go:generate sed -i "" -e s@operator\.@@g $GOPATH/src/$PACKAGE/operator/operator_mock.go
-//go:generate sed -i "" s@.*operator.*github.com.*@@g $GOPATH/src/$PACKAGE/operator/operator_mock.go
-
-// (2) environment package mocks
-//go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/environment_mock.go github.com/m3db/m3em/environment M3DBInstance,M3DBEnvironment,Options"
+// (1) environment package mocks
+//go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/mock_environment.go github.com/m3db/m3em/environment M3DBInstance,M3DBEnvironment,Options"
 //- delete the vendor prefix due to https://github.com/golang/mock/issues/30
-//go:generate sed -i "" s@github.com/m3db/m3em/vendor/@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
+//go:generate sed -i "" s@github.com/m3db/m3em/vendor/@@g $GOPATH/src/$PACKAGE/environment/mock_environment.go
 //- mockgen creates a circle by importing the package within itself
-//go:generate sed -i "" -e s@environment\.@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
-//go:generate sed -i "" s@.*environment.*github.com.*@@g $GOPATH/src/$PACKAGE/environment/environment_mock.go
+//go:generate sed -i "" -e s@environment\.@@g $GOPATH/src/$PACKAGE/environment/mock_environment.go
+//go:generate sed -i "" s@.*environment.*github.com.*@@g $GOPATH/src/$PACKAGE/environment/mock_environment.go
+// (2) operator package mocks
+//go:generate sh -c "mockgen -package=m3em -destination=$GOPATH/src/$PACKAGE/generated/proto/m3em/mock_operator.pb.go github.com/m3db/m3em/generated/proto/m3em OperatorClient,Operator_TransferClient"
+//- delete the vendor prefix due to https://github.com/golang/mock/issues/30
+//go:generate sed -i "" s@github.com/m3db/m3em/vendor/@@g $GOPATH/src/$PACKAGE/generated/proto/m3em/mock_operator.pb.go
+//- mockgen creates a circle by importing the package within itself
+//go:generate sed -i "" -e s@m3em\.@@g $GOPATH/src/$PACKAGE/generated/proto/m3em/mock_operator.pb.go
+//go:generate sed -i "" s@.*m3em.*github.com.*@@g $GOPATH/src/$PACKAGE/generated/proto/m3em/mock_operator.pb.go
 
 package generated

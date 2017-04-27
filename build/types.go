@@ -20,10 +20,23 @@
 
 package build
 
-// ServiceBuild represents a single build of a service, available locally.
-type ServiceBuild interface {
+import (
+	"github.com/m3db/m3em/os/fs"
+)
+
+// IterableBytesWithID represents the an iterable byte stream associated
+// with an identifier
+type IterableBytesWithID interface {
 	// ID returns a string identifier for the build
 	ID() string
+
+	// Iter returns an iterator to loop over the contents of the build
+	Iter(bufferSize int) (fs.FileReaderIter, error)
+}
+
+// ServiceBuild represents a single build of a service, available locally.
+type ServiceBuild interface {
+	IterableBytesWithID
 
 	// SourcePath returns a local path where the service build is available
 	SourcePath() string
@@ -31,8 +44,7 @@ type ServiceBuild interface {
 
 // ServiceConfiguration represents the configuration required to operate a service
 type ServiceConfiguration interface {
-	// ID returns a string identifier for the service configuration
-	ID() string
+	IterableBytesWithID
 
 	// MarshalText returns a UTF-8 serialized representation of the service configuration
 	MarshalText() ([]byte, error)

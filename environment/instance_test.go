@@ -25,8 +25,11 @@ import (
 	"math/rand"
 	"testing"
 
+	"google.golang.org/grpc"
+
 	"github.com/m3db/m3em/build"
-	"github.com/m3db/m3em/operator"
+	"github.com/m3db/m3em/generated/proto/m3em"
+	"github.com/m3db/m3em/os/fs"
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
@@ -52,10 +55,6 @@ func newMockServiceInstance(ctrl *gomock.Controller) services.PlacementInstance 
 	return inst
 }
 
-func newMockOperator(ctrl *gomock.Controller) *operator.MockOperator {
-	return operator.NewMockOperator(ctrl)
-}
-
 func newMockServiceInstances(ctrl *gomock.Controller, numInstances int) []services.PlacementInstance {
 	svcs := make([]services.PlacementInstance, 0, numInstances)
 	for i := 0; i < numInstances; i++ {
@@ -64,135 +63,300 @@ func newMockServiceInstances(ctrl *gomock.Controller, numInstances int) []servic
 	return svcs
 }
 
-func newDefaultOptions() Options {
-	return NewOptions(nil).
-		SetSessionToken("test-token")
+func newTestNodeOptions(c *m3em.MockOperatorClient) NodeOptions {
+	return NewNodeOptions(nil).
+		SetOperatorClientFn(func() (*grpc.ClientConn, m3em.OperatorClient, error) {
+			return nil, c, nil
+		})
 }
 
-func TestServiceInstancePropertyInitialization(t *testing.T) {
+func TestNodePropertyInitialization(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	opts := newDefaultOptions()
+	opts := newTestNodeOptions(nil)
 	mockInstance := newMockServiceInstance(ctrl)
-	mockOperator := newMockOperator(ctrl)
-	m3dbInstance, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	m3dbInstance, err := NewM3DBInstance(mockInstance, opts)
 	require.NoError(t, err)
 	require.Equal(t, mockInstance.ID(), m3dbInstance.ID())
+	require.Equal(t, mockInstance.Endpoint(), m3dbInstance.Endpoint())
+	require.Equal(t, mockInstance.Rack(), m3dbInstance.Rack())
+	require.Equal(t, mockInstance.Zone(), m3dbInstance.Zone())
+	require.Equal(t, mockInstance.Weight(), m3dbInstance.Weight())
+	require.Equal(t, mockInstance.Shards(), m3dbInstance.Shards())
 }
 
-func TestServiceInstanceErrorStatusTransitions(t *testing.T) {
+func TestNodeErrorStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	opts := newDefaultOptions()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	mockOperator := newMockOperator(ctrl)
-	inst, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	inst, err := NewM3DBInstance(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := inst.(*m3dbInst)
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 	m3dbInstance.status = InstanceStatusError
 	require.Error(t, m3dbInstance.Start())
 	require.Error(t, m3dbInstance.Stop())
-	require.Error(t, m3dbInstance.Setup(nil, nil))
+	require.Error(t, m3dbInstance.Setup(nil, nil, "", false))
+}
 
+func TestNodeErrorStatusToResetTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 	m3dbInstance.status = InstanceStatusError
-	mockOperator.EXPECT().Reset()
 	require.NoError(t, m3dbInstance.Reset())
 	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
+}
 
+func TestNodeErrorStatusToTeardownTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 	m3dbInstance.status = InstanceStatusError
-	mockOperator.EXPECT().Teardown()
+	mockClient.EXPECT().Teardown(gomock.Any(), gomock.Any())
 	require.NoError(t, m3dbInstance.Teardown())
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 }
 
-func TestServiceInstanceStatusTransitions(t *testing.T) {
+func TestNodeUninitializedStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	opts := newDefaultOptions()
-	mb := build.NewMockServiceBuild(ctrl)
-	mc := build.NewMockServiceConfiguration(ctrl)
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	mockOperator := newMockOperator(ctrl)
-	m3dbInstance, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	inst, err := NewM3DBInstance(mockInstance, opts)
 	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
-
-	// uninitialized -> setup is the only valid (non-errorneous) transition
 	require.Error(t, m3dbInstance.Start())
 	require.Error(t, m3dbInstance.Stop())
 	require.Error(t, m3dbInstance.Reset())
 	require.Error(t, m3dbInstance.Teardown())
-	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
-	require.NoError(t, m3dbInstance.Setup(mb, mc))
-	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
+}
 
-	// setup -> (running|uninitialized) are the only valid (non-errorneous) transitions
+func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mb := build.NewMockServiceBuild(ctrl)
+	mc := build.NewMockServiceConfiguration(ctrl)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
+
+	forceSetup := false
+	buildChecksum := uint32(123)
+	configChecksum := uint32(321)
+
+	dummyBytes := []byte(`some long string`)
+	dummyBuildIter := fs.NewMockFileReaderIter(ctrl)
+	gomock.InOrder(
+		dummyBuildIter.EXPECT().Next().Return(true),
+		dummyBuildIter.EXPECT().Current().Return(dummyBytes),
+		dummyBuildIter.EXPECT().Next().Return(true),
+		dummyBuildIter.EXPECT().Current().Return(dummyBytes),
+		dummyBuildIter.EXPECT().Next().Return(false),
+		dummyBuildIter.EXPECT().Err().Return(nil),
+		dummyBuildIter.EXPECT().Checksum().Return(buildChecksum),
+		dummyBuildIter.EXPECT().Close(),
+	)
+	mb.EXPECT().ID().Return("build-id")
+	mb.EXPECT().Iter(gomock.Any()).Return(dummyBuildIter, nil)
+	dummyConfIter := fs.NewMockFileReaderIter(ctrl)
+	gomock.InOrder(
+		dummyConfIter.EXPECT().Next().Return(true),
+		dummyConfIter.EXPECT().Current().Return(dummyBytes),
+		dummyConfIter.EXPECT().Next().Return(false),
+		dummyConfIter.EXPECT().Err().Return(nil),
+		dummyConfIter.EXPECT().Checksum().Return(configChecksum),
+		dummyConfIter.EXPECT().Close(),
+	)
+	mc.EXPECT().ID().Return("config-id")
+	mc.EXPECT().Iter(gomock.Any()).Return(dummyConfIter, nil)
+
+	buildTransferClient := m3em.NewMockOperator_TransferClient(ctrl)
+	gomock.InOrder(
+		buildTransferClient.EXPECT().Send(&m3em.TransferRequest{
+			Type:       m3em.FileType_M3DB_BINARY,
+			Filename:   "build-id",
+			Overwrite:  forceSetup,
+			ChunkBytes: dummyBytes,
+			ChunkIdx:   0,
+		}).Return(nil),
+		buildTransferClient.EXPECT().Send(&m3em.TransferRequest{
+			Type:       m3em.FileType_M3DB_BINARY,
+			Filename:   "build-id",
+			Overwrite:  forceSetup,
+			ChunkBytes: dummyBytes,
+			ChunkIdx:   1,
+		}).Return(nil),
+		buildTransferClient.EXPECT().CloseAndRecv().Return(
+			&m3em.TransferResponse{
+				FileChecksum:   buildChecksum,
+				NumChunksRecvd: 2,
+			}, nil,
+		),
+	)
+	configTransferClient := m3em.NewMockOperator_TransferClient(ctrl)
+	gomock.InOrder(
+		configTransferClient.EXPECT().Send(&m3em.TransferRequest{
+			Type:       m3em.FileType_M3DB_CONFIG,
+			Filename:   "config-id",
+			Overwrite:  forceSetup,
+			ChunkBytes: dummyBytes,
+			ChunkIdx:   0,
+		}).Return(nil),
+		configTransferClient.EXPECT().CloseAndRecv().Return(
+			&m3em.TransferResponse{
+				FileChecksum:   configChecksum,
+				NumChunksRecvd: 1,
+			}, nil,
+		),
+	)
+	gomock.InOrder(
+		mockClient.EXPECT().Setup(gomock.Any(), gomock.Any()),
+		mockClient.EXPECT().Transfer(gomock.Any()).Return(buildTransferClient, nil),
+		mockClient.EXPECT().Transfer(gomock.Any()).Return(configTransferClient, nil),
+	)
+
+	require.NoError(t, m3dbInstance.Setup(mb, mc, "", forceSetup))
+	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
+	require.Equal(t, mb, m3dbInstance.currentBuild)
+	require.Equal(t, mc, m3dbInstance.currentConf)
+}
+
+func TestNodeSetupStatusIllegalTransitions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusSetup
 	require.Error(t, m3dbInstance.Stop())
-	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
-	require.NoError(t, m3dbInstance.Setup(mb, mc))
-	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
-	require.NoError(t, m3dbInstance.Setup(mb, mc))
-	mockOperator.EXPECT().Reset()
-	require.NoError(t, m3dbInstance.Reset())
-	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
-	mockOperator.EXPECT().Teardown()
-	require.NoError(t, m3dbInstance.Teardown())
-	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
-	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
-	require.NoError(t, m3dbInstance.Setup(mb, mc))
-	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
-	mockOperator.EXPECT().Start()
-	require.NoError(t, m3dbInstance.Start())
-	require.Equal(t, InstanceStatusRunning, m3dbInstance.Status())
+}
 
-	// running -> (setup|uninitialized) are the only valid (non-errorneous) transitions
-	require.Error(t, m3dbInstance.Start())
-	require.Error(t, m3dbInstance.Setup(mb, mc))
-	mockOperator.EXPECT().Teardown()
+func TestNodeSetupStatusToStartTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusSetup
+	mockClient.EXPECT().Start(gomock.Any(), gomock.Any())
+	require.NoError(t, m3dbInstance.Start())
+	require.Equal(t, InstanceStatusRunning, m3dbInstance.Status())
+}
+
+func TestNodeSetupStatusToTeardownTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusSetup
+	mockClient.EXPECT().Teardown(gomock.Any(), gomock.Any())
 	require.NoError(t, m3dbInstance.Teardown())
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
-	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
-	require.NoError(t, m3dbInstance.Setup(mb, mc))
-	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
-	mockOperator.EXPECT().Start()
-	require.NoError(t, m3dbInstance.Start())
-	require.Equal(t, InstanceStatusRunning, m3dbInstance.Status())
-	mockOperator.EXPECT().Stop()
-	require.NoError(t, m3dbInstance.Stop())
-	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
-	mockOperator.EXPECT().Start()
-	require.NoError(t, m3dbInstance.Start())
-	require.Equal(t, InstanceStatusRunning, m3dbInstance.Status())
-	mockOperator.EXPECT().Reset()
+}
+
+func TestNodeSetupStatusToResetTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusSetup
 	require.NoError(t, m3dbInstance.Reset())
 	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
 }
 
-func TestServiceInstanceSetupBuildVerify(t *testing.T) {
+func TestNodeRunningStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	opts := newDefaultOptions()
-	mb := build.NewMockServiceBuild(ctrl)
-	mc := build.NewMockServiceConfiguration(ctrl)
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	mockOperator := newMockOperator(ctrl)
-	m3dbInstance, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	inst, err := NewM3DBInstance(mockInstance, opts)
 	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusRunning
+	require.Error(t, m3dbInstance.Start())
+	require.Error(t, m3dbInstance.Setup(nil, nil, "", false))
+}
+
+func TestNodeRunningStatusToStopTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusRunning
+	mockClient.EXPECT().Stop(gomock.Any(), gomock.Any())
+	require.NoError(t, m3dbInstance.Stop())
+	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
+}
+
+func TestNodeRunningStatusToTeardownTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusRunning
+	mockClient.EXPECT().Teardown(gomock.Any(), gomock.Any())
+	require.NoError(t, m3dbInstance.Teardown())
 	require.Equal(t, InstanceStatusUninitialized, m3dbInstance.Status())
 
-	mockOperator.EXPECT().Setup(mb, mc, opts.SessionToken(), opts.SessionOverride())
-	require.NoError(t, m3dbInstance.Setup(mb, mc))
+}
+
+func TestNodeRunningStatusToResetTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := m3em.NewMockOperatorClient(ctrl)
+	opts := newTestNodeOptions(mockClient)
+	mockInstance := newMockServiceInstance(ctrl)
+	inst, err := NewM3DBInstance(mockInstance, opts)
+	require.NoError(t, err)
+	m3dbInstance := inst.(*m3dbInst)
+	m3dbInstance.status = InstanceStatusRunning
+	require.NoError(t, m3dbInstance.Reset())
 	require.Equal(t, InstanceStatusSetup, m3dbInstance.Status())
-
-	inst := m3dbInstance.(*m3dbInst)
-	require.Equal(t, mb, inst.currentBuild)
-	require.Equal(t, mc, inst.currentConf)
-
-	mcp := build.NewMockServiceConfiguration(ctrl)
-	require.NoError(t, m3dbInstance.OverrideConfiguration(mcp))
-	require.Equal(t, mcp, inst.currentConf)
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -205,10 +369,9 @@ func TestHealthEndpoint(t *testing.T) {
 		Status:       "NOT_OK",
 	}, nil)
 
-	opts := newDefaultOptions()
+	opts := newTestNodeOptions(nil)
 	mockInstance := newMockServiceInstance(ctrl)
-	mockOperator := newMockOperator(ctrl)
-	inst, err := NewM3DBInstance(mockInstance, mockOperator, opts)
+	inst, err := NewM3DBInstance(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := inst.(*m3dbInst)
 	m3dbInstance.m3dbClient = mockM3DBClient
