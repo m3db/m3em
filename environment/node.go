@@ -43,12 +43,12 @@ import (
 )
 
 var (
-	errUnableToSetupInitializedInstance = fmt.Errorf("unable to setup instance, must be either setup/uninitialized")
-	errUnableToResetInstance            = fmt.Errorf("unable to reset instance, must be either setup/running")
-	errUnableToTeardownInstance         = fmt.Errorf("unable to teardown instance, must be either setup/running")
-	errUnableToStartInstance            = fmt.Errorf("unable to start instance, it must be setup")
-	errUnableToStopInstance             = fmt.Errorf("unable to stop instance, it must be running")
-	errUnableToOverrideConf             = fmt.Errorf("unable to override instance configuration, it must be setup")
+	errUnableToSetupInitializedNode = fmt.Errorf("unable to setup node, must be either setup/uninitialized")
+	errUnableToResetNode            = fmt.Errorf("unable to reset node, must be either setup/running")
+	errUnableToTeardownNode         = fmt.Errorf("unable to teardown node, must be either setup/running")
+	errUnableToStartNode            = fmt.Errorf("unable to start node, it must be setup")
+	errUnableToStopNode             = fmt.Errorf("unable to stop node, it must be running")
+	errUnableToOverrideConf         = fmt.Errorf("unable to override node configuration, it must be setup")
 )
 
 type svcNode struct {
@@ -133,7 +133,7 @@ func (i *svcNode) String() string {
 	i.Lock()
 	defer i.Unlock()
 	return fmt.Sprintf(
-		"Instance[ID=%s, Rack=%s, Zone=%s, Weight=%d, Endpoint=%s, Shards=%s]",
+		"ServiceNode[ID=%s, Rack=%s, Zone=%s, Weight=%d, Endpoint=%s, Shards=%s]",
 		i.id, i.rack, i.zone, i.weight, i.endpoint, i.shards.String(),
 	)
 }
@@ -226,7 +226,7 @@ func (i *svcNode) Setup(
 	defer i.Unlock()
 	if i.status != NodeStatusUninitialized &&
 		i.status != NodeStatusSetup {
-		return errUnableToSetupInitializedInstance
+		return errUnableToSetupInitializedNode
 	}
 
 	i.currentConf = conf
@@ -348,7 +348,7 @@ func (i *svcNode) Teardown() error {
 	if status := i.status; status != NodeStatusRunning &&
 		status != NodeStatusSetup &&
 		status != NodeStatusError {
-		return errUnableToTeardownInstance
+		return errUnableToTeardownNode
 	}
 
 	// clear any listeners
@@ -392,7 +392,7 @@ func (i *svcNode) Start() error {
 	i.Lock()
 	defer i.Unlock()
 	if i.status != NodeStatusSetup {
-		return errUnableToStartInstance
+		return errUnableToStartNode
 	}
 
 	if err := i.opts.Retrier().Attempt(func() error {
@@ -411,7 +411,7 @@ func (i *svcNode) Stop() error {
 	i.Lock()
 	defer i.Unlock()
 	if i.status != NodeStatusRunning {
-		return errUnableToStopInstance
+		return errUnableToStopNode
 	}
 
 	if err := i.opts.Retrier().Attempt(func() error {

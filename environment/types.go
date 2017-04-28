@@ -34,7 +34,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// NodeStatus indicates the different states a ServiceInstance can be in. The
+// NodeStatus indicates the different states a ServiceNode can be in. The
 // state diagram below describes the transitions between the various states:
 //
 //                           ┌──────────────────┐
@@ -66,27 +66,26 @@ import (
 type NodeStatus int
 
 const (
-	// NodeStatusUninitialized refers to the state of an un-initialized instance.
+	// NodeStatusUninitialized refers to the state of an un-initialized node.
 	NodeStatusUninitialized NodeStatus = iota
 
-	// NodeStatusSetup is the state of an instance which has been Setup()
+	// NodeStatusSetup is the state of a node which has been Setup()
 	NodeStatusSetup
 
-	// NodeStatusRunning is the state of an instance which has been Start()-ed
+	// NodeStatusRunning is the state of a node which has been Start()-ed
 	NodeStatusRunning
 
-	// NodeStatusError is the state of an instance which is in an Error state
+	// NodeStatusError is the state of a node which is in an Error state
 	NodeStatusError
 )
 
-// ServiceNode represents a testable instance of M3DB. It controls both the service
-// and resources on the host running the service (e.g. fs, processes, etc.), the latter is
-// available under the Operator() API.
+// ServiceNode represents an executable service node. This object controls both the service
+// and resources on the host running the service (e.g. fs, processes, etc.)
 type ServiceNode interface {
 	services.PlacementInstance
 
 	// Setup initializes the directories, config file, and binary for the process being tested.
-	// It does not Start the process on the ServiceInstance.
+	// It does not Start the process on the ServiceNode.
 	Setup(
 		build build.ServiceBuild,
 		config build.ServiceConfiguration,
@@ -94,13 +93,13 @@ type ServiceNode interface {
 		force bool,
 	) error
 
-	// Start starts the service process for this ServiceInstance.
+	// Start starts the service process for this ServiceNode.
 	Start() error
 
-	// Stop stops the service process for this ServiceInstance.
+	// Stop stops the service process for this ServiceNode.
 	Stop() error
 
-	// Status returns the ServiceInstance status.
+	// Status returns the ServiceNode status.
 	Status() NodeStatus
 
 	// Teardown releases any remote resources used for testing.
@@ -115,7 +114,7 @@ type ServiceNode interface {
 	// DeregisterListener un-registers an event listener
 	DeregisterListener(ListenerID)
 
-	// Health returns the health for this ServiceInstance
+	// Health returns the health for this ServiceNode
 	Health() (ServiceNodeHealth, error)
 
 	// TODO(prateek): add more m3db service endpoints in ServiceNode
@@ -205,16 +204,16 @@ type NodeOptions interface {
 	// InstrumentOptions returns the instrumentation options
 	InstrumentOptions() instrument.Options
 
-	// SetOperationTimeout returns the timeout for instance operations
+	// SetOperationTimeout returns the timeout for node operations
 	SetOperationTimeout(time.Duration) NodeOptions
 
-	// OperationTimeout returns the timeout for instance operations
+	// OperationTimeout returns the timeout for node operations
 	OperationTimeout() time.Duration
 
-	// SetRetrier sets the retrier for instance operations
+	// SetRetrier sets the retrier for node operations
 	SetRetrier(xretry.Retrier) NodeOptions
 
-	// OperationRetrier returns the retrier for instance operations
+	// OperationRetrier returns the retrier for node operations
 	Retrier() xretry.Retrier
 
 	// SetTransferBufferSize sets the bytes buffer size used during file transfer
