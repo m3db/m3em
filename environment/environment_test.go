@@ -34,16 +34,16 @@ var (
 	testServiceID services.ServiceID
 )
 
-func testM3DBInstances(
+func testServiceNodes(
 	t *testing.T,
 	numInstances int,
-) M3DBInstances {
+) ServiceNodes {
 	no := newTestNodeOptions(nil)
-	var m3dbInstances M3DBInstances
+	var m3dbInstances ServiceNodes
 	for i := 0; i < numInstances; i++ {
 		si := placement.NewInstance()
 		si.SetID(fmt.Sprintf("%d", i))
-		inst, err := NewM3DBInstance(si, no)
+		inst, err := NewServiceNode(si, no)
 		require.NoError(t, err)
 		m3dbInstances = append(m3dbInstances, inst)
 	}
@@ -53,9 +53,9 @@ func testM3DBInstances(
 func newTestEnv(
 	t *testing.T,
 	numInstances int,
-) (M3DBInstances, M3DBEnvironment) {
+) (ServiceNodes, M3DBEnvironment) {
 	opts := NewOptions(nil)
-	instances := testM3DBInstances(t, numInstances)
+	instances := testServiceNodes(t, numInstances)
 	env, err := NewM3DBEnvironment(instances, opts)
 	require.NoError(t, err)
 	return instances, env

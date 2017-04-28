@@ -44,14 +44,14 @@ var (
 	errUnableToStopNotRunningCluster   = fmt.Errorf("unable to stop cluster, it is running")
 )
 
-type idToInstanceMap map[string]env.M3DBInstance
+type idToInstanceMap map[string]env.ServiceNode
 
 type m3dbCluster struct {
 	logger        xlog.Logger
 	copts         Options
 	env           env.M3DBEnvironment
 	usedInstances idToInstanceMap
-	spares        []env.M3DBInstance
+	spares        []env.ServiceNode
 	placementSvc  services.PlacementService
 
 	statusLock sync.RWMutex
@@ -81,17 +81,17 @@ func New(
 // TODO(prateek): reset initial placement after teardown
 // TODO(prateek): use concurrency and other options
 
-type concurrentInstanceFn func(env.M3DBInstance)
+type concurrentInstanceFn func(env.ServiceNode)
 
 type concurrentInstanceExecutor struct {
 	wg        sync.WaitGroup
-	instances env.M3DBInstances
+	instances env.ServiceNodes
 	workers   xsync.WorkerPool
 	fn        concurrentInstanceFn
 }
 
 func newConcurrentInstanceExecutor(
-	instances env.M3DBInstances,
+	instances env.ServiceNodes,
 	concurrency int,
 	fn concurrentInstanceFn,
 ) *concurrentInstanceExecutor {
@@ -140,7 +140,7 @@ func (c *m3dbCluster) Setup() error {
 	)
 
 	// setup the instances, in parallel
-	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
+	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.ServiceNode) {
 		if err := inst.Setup(svcBuild, svcConf, sessionToken, sessionOverride); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -156,7 +156,7 @@ func (c *m3dbCluster) Setup() error {
 	return c.markStatus(ClusterStatusSetup, multiErr.FinalError())
 }
 
-func (c *m3dbCluster) Initialize(numNodes int) ([]env.M3DBInstance, error) {
+func (c *m3dbCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
 	if c.Status() != ClusterStatusSetup {
 		return nil, errClusterUnableToInitialize
 	}
@@ -186,7 +186,7 @@ func (c *m3dbCluster) Initialize(numNodes int) ([]env.M3DBInstance, error) {
 	return usedInstances, nil
 }
 
-func (c *m3dbCluster) AddInstance() (env.M3DBInstance, error) {
+func (c *m3dbCluster) AddInstance() (env.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -206,7 +206,7 @@ func (c *m3dbCluster) AddInstance() (env.M3DBInstance, error) {
 	return inst, nil
 }
 
-func (c *m3dbCluster) RemoveInstance(i env.M3DBInstance) error {
+func (c *m3dbCluster) RemoveInstance(i env.ServiceNode) error {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return errClusterUnableToAlterPlacement
 	}
@@ -224,7 +224,7 @@ func (c *m3dbCluster) RemoveInstance(i env.M3DBInstance) error {
 	return nil
 }
 
-func (c *m3dbCluster) ReplaceInstance(oldInstance env.M3DBInstance) (env.M3DBInstance, error) {
+func (c *m3dbCluster) ReplaceInstance(oldInstance env.ServiceNode) (env.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -252,7 +252,7 @@ func (c *m3dbCluster) ReplaceInstance(oldInstance env.M3DBInstance) (env.M3DBIns
 	return spareInstance, nil
 }
 
-func (c *m3dbCluster) Spares() []env.M3DBInstance {
+func (c *m3dbCluster) Spares() []env.ServiceNode {
 	return c.spares
 }
 
@@ -281,7 +281,7 @@ func (c *m3dbCluster) Teardown() error {
 		multiErr  xerrors.MultiError
 	)
 
-	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
+	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.ServiceNode) {
 		if err := inst.Teardown(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -305,13 +305,13 @@ func (c *m3dbCluster) StartInitialized() error {
 	var (
 		lock      sync.Mutex
 		multiErr  xerrors.MultiError
-		instances = make(env.M3DBInstances, 0, len(c.usedInstances))
+		instances = make(env.ServiceNodes, 0, len(c.usedInstances))
 	)
 	for _, inst := range c.usedInstances {
 		instances = append(instances, inst)
 	}
 
-	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
+	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.ServiceNode) {
 		if err := inst.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -335,13 +335,13 @@ func (c *m3dbCluster) Start() error {
 	var (
 		lock      sync.Mutex
 		multiErr  xerrors.MultiError
-		instances = make(env.M3DBInstances, 0, len(c.env.Instances()))
+		instances = make(env.ServiceNodes, 0, len(c.env.Instances()))
 	)
 	for _, inst := range c.env.Instances() {
 		instances = append(instances, inst)
 	}
 
-	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
+	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.ServiceNode) {
 		if err := inst.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -365,13 +365,13 @@ func (c *m3dbCluster) Stop() error {
 	var (
 		lock      sync.Mutex
 		multiErr  xerrors.MultiError
-		instances = make(env.M3DBInstances, 0, len(c.env.Instances()))
+		instances = make(env.ServiceNodes, 0, len(c.env.Instances()))
 	)
 	for _, inst := range c.env.Instances() {
 		instances = append(instances, inst)
 	}
 
-	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
+	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.ServiceNode) {
 		if err := inst.Stop(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)

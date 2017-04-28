@@ -22,17 +22,17 @@ package environment
 
 type m3dbEnv struct {
 	opts        Options
-	instances   M3DBInstances
-	instanceMap map[string]M3DBInstance
+	instances   ServiceNodes
+	instanceMap map[string]ServiceNode
 }
 
-// NewM3DBEnvironment returns a new `M3DBEnvironment` of M3DBInstances.
+// NewM3DBEnvironment returns a new `M3DBEnvironment` of ServiceNodes.
 func NewM3DBEnvironment(
-	instances []M3DBInstance,
+	instances []ServiceNode,
 	opts Options,
 ) (M3DBEnvironment, error) {
-	m3dbInstances := make([]M3DBInstance, 0, len(instances))
-	m3dbInstanceMap := make(map[string]M3DBInstance, len(instances))
+	m3dbInstances := make([]ServiceNode, 0, len(instances))
+	m3dbInstanceMap := make(map[string]ServiceNode, len(instances))
 	for _, m3dbInst := range instances {
 		m3dbInstances = append(m3dbInstances, m3dbInst)
 		m3dbInstanceMap[m3dbInst.ID()] = m3dbInst
@@ -45,11 +45,11 @@ func NewM3DBEnvironment(
 	}, nil
 }
 
-func (u *m3dbEnv) Instances() M3DBInstances {
+func (u *m3dbEnv) Instances() ServiceNodes {
 	return u.instances
 }
 
-func (u *m3dbEnv) InstancesByID() map[string]M3DBInstance {
+func (u *m3dbEnv) InstancesByID() map[string]ServiceNode {
 	return u.instanceMap
 }
 

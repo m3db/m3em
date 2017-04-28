@@ -79,24 +79,24 @@ const (
 	NodeStatusError
 )
 
-// M3DBEnvironment represents a collection of M3DBInstance objects,
+// M3DBEnvironment represents a collection of ServiceNode objects,
 // and other resources required to control them.
 type M3DBEnvironment interface {
 	// Instances returns a list of all the instances in the environment.
-	Instances() M3DBInstances
+	Instances() ServiceNodes
 
 	// InstancesById returns a map [ID -> Instance] of all the
 	// instances in the environment.
-	InstancesByID() map[string]M3DBInstance
+	InstancesByID() map[string]ServiceNode
 
 	// Status returns map from instance ID to Status.
 	Status() map[string]NodeStatus
 }
 
-// M3DBInstance represents a testable instance of M3DB. It controls both the service
+// ServiceNode represents a testable instance of M3DB. It controls both the service
 // and resources on the host running the service (e.g. fs, processes, etc.), the latter is
 // available under the Operator() API.
-type M3DBInstance interface {
+type ServiceNode interface {
 	services.PlacementInstance
 
 	// Setup initializes the directories, config file, and binary for the process being tested.
@@ -130,9 +130,9 @@ type M3DBInstance interface {
 	DeregisterListener(ListenerID)
 
 	// Health returns the health for this ServiceInstance
-	Health() (M3DBInstanceHealth, error)
+	Health() (ServiceNodeHealth, error)
 
-	// TODO(prateek): add more m3db service endpoints in M3DBInstance
+	// TODO(prateek): add more m3db service endpoints in ServiceNode
 	// - query service observable properties (nowFn, detailed_status)
 	// - set nowFn offset
 	// - logs
@@ -164,25 +164,25 @@ type ListenerID int
 // Listener provides callbacks invoked upon remote process state transitions
 type Listener interface {
 	// OnProcessTerminate is invoked when the remote process being run terminates
-	OnProcessTerminate(inst M3DBInstance, desc string)
+	OnProcessTerminate(inst ServiceNode, desc string)
 
 	// OnHeartbeatTimeout is invoked upon remote heartbeats having timed-out
-	OnHeartbeatTimeout(inst M3DBInstance, lastHeartbeatTs time.Time)
+	OnHeartbeatTimeout(inst ServiceNode, lastHeartbeatTs time.Time)
 
 	// OnOverwrite is invoked if remote agent control is overwritten by another
 	// coordinator
-	OnOverwrite(inst M3DBInstance, desc string)
+	OnOverwrite(inst ServiceNode, desc string)
 }
 
-// M3DBInstanceHealth provides M3DBInstance Health
-type M3DBInstanceHealth struct {
+// ServiceNodeHealth provides ServiceNode Health
+type ServiceNodeHealth struct {
 	Bootstrapped bool
 	Status       string
 	OK           bool
 }
 
-// M3DBInstances is a collection of M3DBInstance(s)
-type M3DBInstances []M3DBInstance
+// ServiceNodes is a collection of ServiceNode(s)
+type ServiceNodes []ServiceNode
 
 // Options are the knobs used to tweak Environment interactions
 type Options interface {
@@ -196,10 +196,10 @@ type Options interface {
 	InstrumentOptions() instrument.Options
 
 	// TODO(prateek-ref): migrate to ClusterOptions
-	// // SetListener sets the M3DBInstanceListener
-	// SetListener(M3DBInstanceListener) Options
-	// // Listener returns the M3DBInstanceListener
-	// Listener() M3DBInstanceListener
+	// // SetListener sets the ServiceNodeListener
+	// SetListener(ServiceNodeListener) Options
+	// // Listener returns the ServiceNodeListener
+	// Listener() ServiceNodeListener
 
 	// SetNodeOptions sets the NodeOptions
 	SetNodeOptions(NodeOptions) Options

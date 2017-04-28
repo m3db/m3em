@@ -75,7 +75,7 @@ func TestNodePropertyInitialization(t *testing.T) {
 
 	opts := newTestNodeOptions(nil)
 	mockInstance := newMockServiceInstance(ctrl)
-	m3dbInstance, err := NewM3DBInstance(mockInstance, opts)
+	m3dbInstance, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	require.Equal(t, mockInstance.ID(), m3dbInstance.ID())
 	require.Equal(t, mockInstance.Endpoint(), m3dbInstance.Endpoint())
@@ -91,7 +91,7 @@ func TestNodeErrorStatusIllegalTransitions(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	require.Equal(t, NodeStatusUninitialized, m3dbInstance.Status())
@@ -107,7 +107,7 @@ func TestNodeErrorStatusToTeardownTransition(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	require.Equal(t, NodeStatusUninitialized, m3dbInstance.Status())
@@ -123,7 +123,7 @@ func TestNodeUninitializedStatusIllegalTransitions(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	require.Equal(t, NodeStatusUninitialized, m3dbInstance.Status())
@@ -140,7 +140,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	mb := build.NewMockServiceBuild(ctrl)
 	mc := build.NewMockServiceConfiguration(ctrl)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	require.Equal(t, NodeStatusUninitialized, m3dbInstance.Status())
@@ -232,7 +232,7 @@ func TestNodeSetupStatusIllegalTransitions(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.status = NodeStatusSetup
@@ -245,7 +245,7 @@ func TestNodeSetupStatusToStartTransition(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.status = NodeStatusSetup
@@ -260,7 +260,7 @@ func TestNodeSetupStatusToTeardownTransition(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.status = NodeStatusSetup
@@ -275,7 +275,7 @@ func TestNodeRunningStatusIllegalTransitions(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.status = NodeStatusRunning
@@ -289,7 +289,7 @@ func TestNodeRunningStatusToStopTransition(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.status = NodeStatusRunning
@@ -304,7 +304,7 @@ func TestNodeRunningStatusToTeardownTransition(t *testing.T) {
 	mockClient := m3em.NewMockOperatorClient(ctrl)
 	opts := newTestNodeOptions(mockClient)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.status = NodeStatusRunning
@@ -326,7 +326,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 	opts := newTestNodeOptions(nil)
 	mockInstance := newMockServiceInstance(ctrl)
-	node, err := NewM3DBInstance(mockInstance, opts)
+	node, err := NewServiceNode(mockInstance, opts)
 	require.NoError(t, err)
 	m3dbInstance := node.(*svcNode)
 	m3dbInstance.m3dbClient = mockM3DBClient

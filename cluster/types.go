@@ -96,23 +96,23 @@ type Cluster interface {
 	Setup() error
 
 	// Initialize initializes service placement for the specified numNodes.
-	Initialize(numNodes int) ([]env.M3DBInstance, error)
+	Initialize(numNodes int) ([]env.ServiceNode, error)
 
 	// AddInstance adds the specified instance to the service placement. It does
 	// NOT alter the state of the ServiceInstance (i.e. does not start/stop it).
-	AddInstance() (env.M3DBInstance, error)
+	AddInstance() (env.ServiceNode, error)
 
 	// RemoveInstance removes the specified instance from the service placement. It does
 	// NOT alter the state of the ServiceInstance (i.e. does not start/stop it).
-	RemoveInstance(env.M3DBInstance) error
+	RemoveInstance(env.ServiceNode) error
 
 	// ReplaceInstance replaces the specified instance with a new instance in the service
 	// placement. It does NOT alter the state of the TestInstance (i.e. does not start/stop it).
-	ReplaceInstance(oldInstance env.M3DBInstance) (env.M3DBInstance, error)
+	ReplaceInstance(oldInstance env.ServiceNode) (env.ServiceNode, error)
 
 	// Spares returns the instances available in the environment which are not part of the
 	// cluster (i.e. placement).
-	Spares() []env.M3DBInstance
+	Spares() []env.ServiceNode
 
 	// Teardown releases the resources acquired during Setup().
 	Teardown() error

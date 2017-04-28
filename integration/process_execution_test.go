@@ -69,7 +69,7 @@ func TestProcessExecution(t *testing.T) {
 	nodeOpts := environment.NewNodeOptions(iopts).
 		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := environment.NewM3DBInstance(svc, nodeOpts)
+	node, err := environment.NewServiceNode(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 

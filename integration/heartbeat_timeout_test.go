@@ -92,7 +92,7 @@ func TestHeartbeatTimeout(t *testing.T) {
 		SetHeartbeatOptions(hbOpts).
 		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := environment.NewM3DBInstance(svc, nodeOpts)
+	node, err := environment.NewServiceNode(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 
@@ -102,16 +102,16 @@ func TestHeartbeatTimeout(t *testing.T) {
 		receivedTimeout = false
 	)
 	eventListener := environment.NewListener(
-		func(_ environment.M3DBInstance, s string) {
+		func(_ environment.ServiceNode, s string) {
 			require.FailNow(t, "received termination: %v", s)
 		},
-		func(_ environment.M3DBInstance, ts time.Time) {
+		func(_ environment.ServiceNode, ts time.Time) {
 			require.False(t, receivedTimeout)
 			lock.Lock()
 			receivedTimeout = true
 			lock.Unlock()
 		},
-		func(_ environment.M3DBInstance, s string) {
+		func(_ environment.ServiceNode, s string) {
 			require.FailNow(t, "received overwrite: %v", s)
 		},
 	)

@@ -104,7 +104,7 @@ type opHeartbeatServer struct {
 	sync.RWMutex
 	opts            HeartbeatOptions
 	iopts           instrument.Options
-	node            M3DBInstance // TODO(prateek-ref): set this value
+	node            ServiceNode // TODO(prateek-ref): set this value
 	listeners       *listenerGroup
 	lastHeartbeat   hb.HeartbeatRequest
 	lastHeartbeatTs time.Time

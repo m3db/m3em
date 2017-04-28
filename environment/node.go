@@ -74,11 +74,11 @@ type svcNode struct {
 	m3dbClient m3dbrpc.TChanNode
 }
 
-// NewM3DBInstance returns a new M3DBInstance.
-func NewM3DBInstance(
+// NewServiceNode returns a new ServiceNode.
+func NewServiceNode(
 	inst services.PlacementInstance,
 	opts NodeOptions,
-) (M3DBInstance, error) {
+) (ServiceNode, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -457,8 +457,8 @@ func (i *svcNode) thriftClient() (m3dbrpc.TChanNode, error) {
 	return i.m3dbClient, nil
 }
 
-func (i *svcNode) Health() (M3DBInstanceHealth, error) {
-	healthResult := M3DBInstanceHealth{}
+func (i *svcNode) Health() (ServiceNodeHealth, error) {
+	healthResult := ServiceNodeHealth{}
 
 	client, err := i.thriftClient()
 	if err != nil {

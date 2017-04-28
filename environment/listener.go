@@ -7,9 +7,9 @@ import (
 
 // NewListener creates a new listener
 func NewListener(
-	onProcessTerminate func(M3DBInstance, string),
-	onHeartbeatTimeout func(M3DBInstance, time.Time),
-	onOverwrite func(M3DBInstance, string),
+	onProcessTerminate func(ServiceNode, string),
+	onHeartbeatTimeout func(ServiceNode, time.Time),
+	onOverwrite func(ServiceNode, string),
 ) Listener {
 	return &listener{
 		onProcessTerminate: onProcessTerminate,
@@ -19,24 +19,24 @@ func NewListener(
 }
 
 type listener struct {
-	onProcessTerminate func(M3DBInstance, string)
-	onHeartbeatTimeout func(M3DBInstance, time.Time)
-	onOverwrite        func(M3DBInstance, string)
+	onProcessTerminate func(ServiceNode, string)
+	onHeartbeatTimeout func(ServiceNode, time.Time)
+	onOverwrite        func(ServiceNode, string)
 }
 
-func (l *listener) OnProcessTerminate(node M3DBInstance, desc string) {
+func (l *listener) OnProcessTerminate(node ServiceNode, desc string) {
 	if l.onProcessTerminate != nil {
 		l.onProcessTerminate(node, desc)
 	}
 }
 
-func (l *listener) OnHeartbeatTimeout(node M3DBInstance, lastHeartbeatTs time.Time) {
+func (l *listener) OnHeartbeatTimeout(node ServiceNode, lastHeartbeatTs time.Time) {
 	if l.onHeartbeatTimeout != nil {
 		l.onHeartbeatTimeout(node, lastHeartbeatTs)
 	}
 }
 
-func (l *listener) OnOverwrite(node M3DBInstance, desc string) {
+func (l *listener) OnOverwrite(node ServiceNode, desc string) {
 	if l.onOverwrite != nil {
 		l.onOverwrite(node, desc)
 	}
@@ -76,7 +76,7 @@ func (lg *listenerGroup) remove(t int) {
 	delete(lg.elems, t)
 }
 
-func (lg *listenerGroup) notifyTimeout(node M3DBInstance, lastTs time.Time) {
+func (lg *listenerGroup) notifyTimeout(node ServiceNode, lastTs time.Time) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
@@ -84,7 +84,7 @@ func (lg *listenerGroup) notifyTimeout(node M3DBInstance, lastTs time.Time) {
 	}
 }
 
-func (lg *listenerGroup) notifyTermination(node M3DBInstance, desc string) {
+func (lg *listenerGroup) notifyTermination(node ServiceNode, desc string) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
@@ -92,7 +92,7 @@ func (lg *listenerGroup) notifyTermination(node M3DBInstance, desc string) {
 	}
 }
 
-func (lg *listenerGroup) notifyOverwrite(node M3DBInstance, desc string) {
+func (lg *listenerGroup) notifyOverwrite(node ServiceNode, desc string) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
