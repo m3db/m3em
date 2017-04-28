@@ -22,7 +22,7 @@ package cluster
 
 import (
 	"github.com/m3db/m3em/build"
-	env "github.com/m3db/m3em/environment"
+	"github.com/m3db/m3em/node"
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3x/instrument"
@@ -96,24 +96,24 @@ type Cluster interface {
 	Setup() error
 
 	// Initialize initializes service placement for the specified numNodes.
-	Initialize(numNodes int) ([]env.ServiceNode, error)
+	Initialize(numNodes int) ([]node.ServiceNode, error)
 
 	// AddNode adds the specified node to the service placement. It does
 	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
-	AddNode() (env.ServiceNode, error)
+	AddNode() (node.ServiceNode, error)
 
 	// RemoveNode removes the specified node from the service placement. It does
 	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
-	RemoveNode(env.ServiceNode) error
+	RemoveNode(node.ServiceNode) error
 
 	// ReplaceNode replaces the specified node with new node(s) in the service
 	// placement. It does NOT alter the state of the TestNode (i.e. does not start/stop it).
 	// TODO(prateek-ref): use new interface for replace
-	ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error)
+	ReplaceNode(oldNode node.ServiceNode) (node.ServiceNode, error)
 
 	// Spares returns the nodes available in the environment which are not part of the
 	// cluster (i.e. placement).
-	Spares() []env.ServiceNode
+	Spares() []node.ServiceNode
 
 	// Teardown releases the resources acquired during Setup().
 	Teardown() error

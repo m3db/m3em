@@ -32,8 +32,8 @@ import (
 	"github.com/m3db/m3cluster/services/placement"
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
-	"github.com/m3db/m3em/environment"
 	"github.com/m3db/m3em/generated/proto/m3em"
+	"github.com/m3db/m3em/node"
 
 	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
@@ -64,10 +64,10 @@ func TestFileTransfer(t *testing.T) {
 	defer server.GracefulStop()
 
 	// create operator to communicate with agent
-	nodeOpts := environment.NewNodeOptions(iopts).
+	nodeOpts := node.NewNodeOptions(iopts).
 		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := environment.NewServiceNode(svc, nodeOpts)
+	node, err := node.NewServiceNode(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 

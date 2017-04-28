@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"github.com/m3db/m3em/build"
-	env "github.com/m3db/m3em/environment"
-	mockenv "github.com/m3db/m3em/environment/mocks"
+	"github.com/m3db/m3em/node"
+	mocknode "github.com/m3db/m3em/node/mocks"
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
@@ -52,9 +52,9 @@ func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.Placeme
 		SetSessionToken(defaultTestSessionToken)
 }
 
-func newMockServiceNode(ctrl *gomock.Controller) env.ServiceNode {
+func newMockServiceNode(ctrl *gomock.Controller) node.ServiceNode {
 	r := defaultRandomVar
-	node := mockenv.NewMockServiceNode(ctrl)
+	node := mocknode.NewMockServiceNode(ctrl)
 	node.EXPECT().ID().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
 	node.EXPECT().Rack().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
 	node.EXPECT().Endpoint().AnyTimes().Return(fmt.Sprintf("%v:%v", r.Int(), r.Int()))
@@ -71,9 +71,9 @@ type expectNodeCallTypes struct {
 	expectStart    bool
 }
 
-func addDefaultStatusExpects(nodes []env.ServiceNode, calls expectNodeCallTypes) []env.ServiceNode {
+func addDefaultStatusExpects(nodes []node.ServiceNode, calls expectNodeCallTypes) []node.ServiceNode {
 	for _, node := range nodes {
-		mNode := node.(*mockenv.MockServiceNode)
+		mNode := node.(*mocknode.MockServiceNode)
 		if calls.expectSetup {
 			mNode.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 		}
@@ -90,8 +90,8 @@ func addDefaultStatusExpects(nodes []env.ServiceNode, calls expectNodeCallTypes)
 	return nodes
 }
 
-func newMockServiceNodes(ctrl *gomock.Controller, numNodes int) []env.ServiceNode {
-	nodes := make([]env.ServiceNode, 0, numNodes)
+func newMockServiceNodes(ctrl *gomock.Controller, numNodes int) []node.ServiceNode {
+	nodes := make([]node.ServiceNode, 0, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodes = append(nodes, newMockServiceNode(ctrl))
 	}
@@ -342,7 +342,7 @@ func TestClusterSetup(t *testing.T) {
 		nodes                = newMockServiceNodes(ctrl, 5)
 	)
 	for _, node := range nodes {
-		mi := node.(*mockenv.MockServiceNode)
+		mi := node.(*mocknode.MockServiceNode)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	cluster, err := New(nodes, opts)
@@ -365,7 +365,7 @@ func TestClusterInitialize(t *testing.T) {
 		nodes                = newMockServiceNodes(ctrl, 5)
 	)
 	for _, node := range nodes {
-		mi := node.(*mockenv.MockServiceNode)
+		mi := node.(*mocknode.MockServiceNode)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	cluster, err := New(nodes, opts)
@@ -395,7 +395,7 @@ func TestClusterInitialize(t *testing.T) {
 	// test StartInitialized
 	for _, node := range nodes {
 		if spare.ID() != node.ID() {
-			mi := node.(*mockenv.MockServiceNode)
+			mi := node.(*mocknode.MockServiceNode)
 			mi.EXPECT().Start().Return(nil)
 		}
 	}

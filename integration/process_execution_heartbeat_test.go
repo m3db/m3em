@@ -35,9 +35,9 @@ import (
 	"github.com/m3db/m3cluster/services/placement"
 	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
-	"github.com/m3db/m3em/environment"
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
+	"github.com/m3db/m3em/node"
 
 	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
@@ -74,7 +74,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	defer server.GracefulStop()
 
 	// create new heartbeat router
-	hbRouter := environment.NewHeartbeatRouter(heartbeatListener.Addr().String())
+	hbRouter := node.NewHeartbeatRouter(heartbeatListener.Addr().String())
 	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
 	hb.RegisterHeartbeaterServer(hbServer, hbRouter)
 	go func() {
@@ -83,14 +83,14 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	defer hbServer.GracefulStop()
 
 	// create operator to communicate with agent
-	hbOpts := environment.NewHeartbeatOptions().
+	hbOpts := node.NewHeartbeatOptions().
 		SetEnabled(true).
 		SetHeartbeatRouter(hbRouter)
-	nodeOpts := environment.NewNodeOptions(iopts).
+	nodeOpts := node.NewNodeOptions(iopts).
 		SetHeartbeatOptions(hbOpts).
 		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := environment.NewServiceNode(svc, nodeOpts)
+	node, err := node.NewServiceNode(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 	// capture notifications from operator
@@ -98,17 +98,17 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 		lock                sync.Mutex
 		notifiedTermination = false
 	)
-	eventListener := environment.NewListener(
-		func(_ environment.ServiceNode, s string) {
+	eventListener := node.NewListener(
+		func(_ node.ServiceNode, s string) {
 			require.False(t, notifiedTermination)
 			lock.Lock()
 			notifiedTermination = true
 			lock.Unlock()
 		},
-		func(_ environment.ServiceNode, ts time.Time) {
+		func(_ node.ServiceNode, ts time.Time) {
 			require.FailNow(t, "received timeout: %v", ts.String())
 		},
-		func(_ environment.ServiceNode, s string) {
+		func(_ node.ServiceNode, s string) {
 			require.FailNow(t, "received overwrite: %v", s)
 		},
 	)

@@ -24,8 +24,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/m3db/m3em/node"
+
 	"github.com/m3db/m3cluster/services"
-	env "github.com/m3db/m3em/environment"
 	"github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 	"github.com/m3db/m3x/sync"
@@ -43,14 +44,14 @@ var (
 	errUnableToStopNotRunningCluster   = fmt.Errorf("unable to stop cluster, it is running")
 )
 
-type idToNodeMap map[string]env.ServiceNode
+type idToNodeMap map[string]node.ServiceNode
 
 type svcCluster struct {
 	logger       xlog.Logger
 	opts         Options
-	knownNodes   env.ServiceNodes
+	knownNodes   node.ServiceNodes
 	usedNodes    idToNodeMap
-	spares       []env.ServiceNode
+	spares       []node.ServiceNode
 	placementSvc services.PlacementService
 
 	statusLock sync.RWMutex
@@ -60,7 +61,7 @@ type svcCluster struct {
 
 // New returns a new cluster backed by provided service nodes
 func New(
-	nodes env.ServiceNodes,
+	nodes node.ServiceNodes,
 	opts Options,
 ) (Cluster, error) {
 	if err := opts.Validate(); err != nil {
@@ -80,17 +81,17 @@ func New(
 // TODO(prateek): reset initial placement after teardown
 // TODO(prateek): use concurrency and other options
 
-type concurrentNodeFn func(env.ServiceNode)
+type concurrentNodeFn func(node.ServiceNode)
 
 type concurrentNodeExecutor struct {
 	wg      sync.WaitGroup
-	nodes   env.ServiceNodes
+	nodes   node.ServiceNodes
 	workers xsync.WorkerPool
 	fn      concurrentNodeFn
 }
 
 func newConcurrentNodeExecutor(
-	nodes env.ServiceNodes,
+	nodes node.ServiceNodes,
 	concurrency int,
 	fn concurrentNodeFn,
 ) *concurrentNodeExecutor {
@@ -138,7 +139,7 @@ func (c *svcCluster) Setup() error {
 	)
 
 	// setup the nodes, in parallel
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Setup(svcBuild, svcConf, sessionToken, sessionOverride); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -154,7 +155,7 @@ func (c *svcCluster) Setup() error {
 	return c.markStatus(ClusterStatusSetup, multiErr.FinalError())
 }
 
-func (c *svcCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
+func (c *svcCluster) Initialize(numNodes int) ([]node.ServiceNode, error) {
 	if c.Status() != ClusterStatusSetup {
 		return nil, errClusterUnableToInitialize
 	}
@@ -184,7 +185,7 @@ func (c *svcCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
 	return usedNodes, nil
 }
 
-func (c *svcCluster) AddNode() (env.ServiceNode, error) {
+func (c *svcCluster) AddNode() (node.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -204,7 +205,7 @@ func (c *svcCluster) AddNode() (env.ServiceNode, error) {
 	return node, nil
 }
 
-func (c *svcCluster) RemoveNode(i env.ServiceNode) error {
+func (c *svcCluster) RemoveNode(i node.ServiceNode) error {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return errClusterUnableToAlterPlacement
 	}
@@ -222,7 +223,7 @@ func (c *svcCluster) RemoveNode(i env.ServiceNode) error {
 	return nil
 }
 
-func (c *svcCluster) ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error) {
+func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) (node.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -250,7 +251,7 @@ func (c *svcCluster) ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, erro
 	return spareNode, nil
 }
 
-func (c *svcCluster) Spares() []env.ServiceNode {
+func (c *svcCluster) Spares() []node.ServiceNode {
 	return c.spares
 }
 
@@ -278,7 +279,7 @@ func (c *svcCluster) Teardown() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Teardown(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -302,13 +303,13 @@ func (c *svcCluster) StartInitialized() error {
 	var (
 		lock     sync.Mutex
 		multiErr xerrors.MultiError
-		nodes    = make(env.ServiceNodes, 0, len(c.usedNodes))
+		nodes    = make(node.ServiceNodes, 0, len(c.usedNodes))
 	)
 	for _, node := range c.usedNodes {
 		nodes = append(nodes, node)
 	}
 
-	executor := newConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -334,7 +335,7 @@ func (c *svcCluster) Start() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -360,7 +361,7 @@ func (c *svcCluster) Stop() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Stop(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
