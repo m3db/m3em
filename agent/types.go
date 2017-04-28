@@ -79,8 +79,9 @@ type Options interface {
 
 // HostResourcesFn is used by the Agent to capture/release any resources
 // required on the host. E.g. we use hosts that are typically running
-// m3db for staging, for our integration tests as well. So we use this
-// function hook to stop any running instances of m3dbnode on the host.
+// staging versions of the service being tested, for our integration tests
+// as well. So we use this function hook to stop any running instances of
+// said service on the host.
 type HostResourcesFn func() error
 
 // ExecGenFn specifies the command to execute for a given build, and config
