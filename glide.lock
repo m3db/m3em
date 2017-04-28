@@ -1,10 +1,6 @@
 hash: fa4a61e16b0de60cce29addb7f78179db6026a5a02693bb35f38e0eb874618ee
 updated: 2017-04-28T15:54:26.142621645-04:00
 imports:
-- name: github.com/apache/thrift
-  version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
-  subpackages:
-  - lib/go/thrift
 - name: github.com/davecgh/go-spew
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
