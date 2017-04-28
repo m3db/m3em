@@ -1,5 +1,11 @@
 package: github.com/m3db/m3em
 import:
+- package: github.com/apache/thrift
+  version: master
+  repo: git://git.apache.org/thrift.git
+  vcs: git
+  subpackages:
+  - lib/go/thrift
 - package: github.com/golang/mock
   version: bd3c8e81be01eef76d4b503f5e687d2d1354d2d9
   subpackages:
