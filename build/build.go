@@ -24,41 +24,41 @@ import (
 	"github.com/m3db/m3em/os/fs"
 )
 
-type m3dbBuild struct {
+type svcBuild struct {
 	id         string
 	sourcePath string
 }
 
-func (b *m3dbBuild) ID() string {
+func (b *svcBuild) ID() string {
 	return b.id
 }
 
-func (b *m3dbBuild) Iter(bufferSize int) (fs.FileReaderIter, error) {
+func (b *svcBuild) Iter(bufferSize int) (fs.FileReaderIter, error) {
 	return fs.NewSizedFileReaderIter(b.sourcePath, bufferSize)
 }
 
-func (b *m3dbBuild) SourcePath() string {
+func (b *svcBuild) SourcePath() string {
 	return b.sourcePath
 }
 
-// NewM3DBBuild constructs a new ServiceBuild representing an M3DB build
-func NewM3DBBuild(id string, sourcePath string) ServiceBuild {
-	return &m3dbBuild{
+// NewServiceBuild constructs a new ServiceBuild representing an M3DB build
+func NewServiceBuild(id string, sourcePath string) ServiceBuild {
+	return &svcBuild{
 		id:         id,
 		sourcePath: sourcePath,
 	}
 }
 
-type m3dbConfig struct {
+type svcConfig struct {
 	id    string
 	bytes []byte // TODO(prateek): replace with YAML nested structure
 }
 
-func (c *m3dbConfig) ID() string {
+func (c *svcConfig) ID() string {
 	return c.id
 }
 
-func (c *m3dbConfig) Iter(_ int) (fs.FileReaderIter, error) {
+func (c *svcConfig) Iter(_ int) (fs.FileReaderIter, error) {
 	bytes, err := c.MarshalText()
 	if err != nil {
 		return nil, err
@@ -66,17 +66,17 @@ func (c *m3dbConfig) Iter(_ int) (fs.FileReaderIter, error) {
 	return fs.NewBytesReaderIter(bytes), nil
 }
 
-func (c *m3dbConfig) MarshalText() ([]byte, error) {
+func (c *svcConfig) MarshalText() ([]byte, error) {
 	return c.bytes, nil // TODO(prateek): replace with yaml marshalling
 }
 
-func (c *m3dbConfig) UnmarshalText(b []byte) error {
+func (c *svcConfig) UnmarshalText(b []byte) error {
 	panic("not implemented")
 }
 
-// NewM3DBConfig returns a new M3DB configuration
-func NewM3DBConfig(id string, marshalledBytes []byte) ServiceConfiguration {
-	return &m3dbConfig{
+// NewServiceConfig returns a new M3DB configuration
+func NewServiceConfig(id string, marshalledBytes []byte) ServiceConfiguration {
+	return &svcConfig{
 		id:    id,
 		bytes: marshalledBytes,
 	}

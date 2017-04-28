@@ -76,12 +76,12 @@ func TestProccessStreamingOutputExecution(t *testing.T) {
 	// create test build
 	execScript := newTestScript(t, targetLocation, 0, longRunningTestProgram)
 	testBuildID := "target-file.sh"
-	testBinary := build.NewM3DBBuild(testBuildID, execScript)
+	testBinary := build.NewServiceBuild(testBuildID, execScript)
 
 	// create test config
 	confContents := []byte("some longer string of text\nthat goes on, on and on\n")
 	testConfigID := "target-file.conf"
-	testConfig := build.NewM3DBConfig(testConfigID, confContents)
+	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
 	// get the files transferred over
 	err = node.Setup(testBinary, testConfig, "tok", false)

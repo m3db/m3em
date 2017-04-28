@@ -77,13 +77,13 @@ func TestFileTransfer(t *testing.T) {
 	defer os.Remove(testFile.Name())
 	testBuildID := "target-file.out"
 	targetBuildFile := path.Join(targetLocation, testBuildID)
-	testBinary := build.NewM3DBBuild(testBuildID, testFile.Name())
+	testBinary := build.NewServiceBuild(testBuildID, testFile.Name())
 
 	// create test config
 	confContents := []byte("some longer string of text\nthat goes on, on and on\n")
 	testConfigID := "target-file.conf"
 	targetConfigFile := path.Join(targetLocation, testConfigID)
-	testConfig := build.NewM3DBConfig(testConfigID, confContents)
+	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
 	err = node.Setup(testBinary, testConfig, "tok", false)
 	require.NoError(t, err)
