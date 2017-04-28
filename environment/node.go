@@ -109,7 +109,7 @@ func NewServiceNode(
 		}
 	}
 
-	retInst := &svcNode{
+	retNode := &svcNode{
 		logger:            opts.InstrumentOptions().Logger(),
 		opts:              opts,
 		id:                node.ID(),
@@ -126,7 +126,7 @@ func NewServiceNode(
 		heartbeatEndpoint: routerEndpoint,
 		operatorUUID:      hbUUID,
 	}
-	return retInst, nil
+	return retNode, nil
 }
 
 func (i *svcNode) String() string {

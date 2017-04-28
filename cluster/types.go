@@ -72,17 +72,17 @@ const (
 	// ClusterStatusUninitialized refers to the state of an un-initialized cluster.
 	ClusterStatusUninitialized Status = iota
 
-	// ClusterStatusSetup refers to the state of a cluster whose instances have been
-	// setup. In this state, the instances are not running, and the cluster services
+	// ClusterStatusSetup refers to the state of a cluster whose nodes have been
+	// setup. In this state, the nodes are not running, and the cluster services
 	// do not have a defined placement.
 	ClusterStatusSetup
 
-	// ClusterStatusInitialized refers to the state of a cluster whose instances have
+	// ClusterStatusInitialized refers to the state of a cluster whose nodes have
 	// been setup, and the cluster has an assigned placement.
 	ClusterStatusInitialized
 
-	// ClusterStatusRunning refers to the state of a cluster with running instances.
-	// There is no restriction on the number of instances running, or assigned within
+	// ClusterStatusRunning refers to the state of a cluster with running nodes.
+	// There is no restriction on the number of nodes running, or assigned within
 	// the cluster placement.
 	ClusterStatusRunning
 
@@ -90,9 +90,9 @@ const (
 	ClusterStatusError
 )
 
-// Cluster is a collection of clustered M3DB instances.
+// Cluster is a collection of clustered M3DB nodes.
 type Cluster interface {
-	// Setup the instances in the Environment provided during construction.
+	// Setup the nodes in the Environment provided during construction.
 	Setup() error
 
 	// Initialize initializes service placement for the specified numNodes.
@@ -110,20 +110,20 @@ type Cluster interface {
 	// placement. It does NOT alter the state of the TestInstance (i.e. does not start/stop it).
 	ReplaceInstance(oldInstance env.ServiceNode) (env.ServiceNode, error)
 
-	// Spares returns the instances available in the environment which are not part of the
+	// Spares returns the nodes available in the environment which are not part of the
 	// cluster (i.e. placement).
 	Spares() []env.ServiceNode
 
 	// Teardown releases the resources acquired during Setup().
 	Teardown() error
 
-	// StartInitialized starts any instances which have been initialized and are not running.
+	// StartInitialized starts any nodes which have been initialized and are not running.
 	StartInitialized() error
 
-	// Start starts all instances known in the environment, regardless of initialization.
+	// Start starts all nodes known in the environment, regardless of initialization.
 	Start() error
 
-	// Stop stops any running instances in the environment.
+	// Stop stops any running nodes in the environment.
 	Stop() error
 
 	// Status returns the cluster status
@@ -195,11 +195,11 @@ type Options interface {
 	// configuration
 	PlacementService() services.PlacementService
 
-	// SetInstanceConcurrency sets the number of instances to operate upon
+	// SetInstanceConcurrency sets the number of nodes to operate upon
 	// concurrently
 	SetInstanceConcurrency(int) Options
 
-	// InstanceConcurrency returns the number of instances to operate upon
+	// InstanceConcurrency returns the number of nodes to operate upon
 	// concurrently
 	InstanceConcurrency() int
 }

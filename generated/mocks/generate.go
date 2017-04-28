@@ -24,7 +24,7 @@
 
 // mockgen rules for generating mocks for exported interfaces (reflection mode). TBH this mode is sketch af.
 // (1) environment package mocks
-//go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/mocks/mock_environment.go github.com/m3db/m3em/environment ServiceNode,M3DBEnvironment,Options"
+//go:generate sh -c "mockgen -package=environment -destination=$GOPATH/src/$PACKAGE/environment/mocks/mock_environment.go github.com/m3db/m3em/environment ServiceNode,NodeOptions"
 //- delete the vendor prefix due to https://github.com/golang/mock/issues/30
 //go:generate sed -i "" s@github.com/m3db/m3em/vendor/@@g $GOPATH/src/$PACKAGE/environment/mocks/mock_environment.go
 //- mockgen creates a circle by importing the package within itself

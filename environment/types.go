@@ -79,20 +79,6 @@ const (
 	NodeStatusError
 )
 
-// M3DBEnvironment represents a collection of ServiceNode objects,
-// and other resources required to control them.
-type M3DBEnvironment interface {
-	// Instances returns a list of all the instances in the environment.
-	Instances() ServiceNodes
-
-	// InstancesById returns a map [ID -> Instance] of all the
-	// instances in the environment.
-	InstancesByID() map[string]ServiceNode
-
-	// Status returns map from instance ID to Status.
-	Status() map[string]NodeStatus
-}
-
 // ServiceNode represents a testable instance of M3DB. It controls both the service
 // and resources on the host running the service (e.g. fs, processes, etc.), the latter is
 // available under the Operator() API.

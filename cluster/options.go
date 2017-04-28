@@ -43,7 +43,6 @@ type m3dbClusterOpts struct {
 	svcBuild        build.ServiceBuild
 	svcConf         build.ServiceConfiguration
 	placementSvc    services.PlacementService
-	maxInstances    int
 	replication     int
 	numShards       int
 	concurrency     int

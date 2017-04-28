@@ -52,12 +52,6 @@ func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.Placeme
 		SetSessionToken(defaultTestSessionToken)
 }
 
-func newMockEnvironment(ctrl *gomock.Controller, instances env.ServiceNodes) env.M3DBEnvironment {
-	menv := mockenv.NewMockM3DBEnvironment(ctrl)
-	menv.EXPECT().Instances().AnyTimes().Return(instances)
-	return menv
-}
-
 func newMockServiceNode(ctrl *gomock.Controller) env.ServiceNode {
 	r := defaultRandomVar
 	node := mockenv.NewMockServiceNode(ctrl)
@@ -77,31 +71,31 @@ type expectInstanceCallTypes struct {
 	expectStart    bool
 }
 
-func addDefaultStatusExpects(instances []env.ServiceNode, calls expectInstanceCallTypes) []env.ServiceNode {
-	for _, node := range instances {
-		mInst := node.(*mockenv.MockServiceNode)
+func addDefaultStatusExpects(nodes []env.ServiceNode, calls expectInstanceCallTypes) []env.ServiceNode {
+	for _, node := range nodes {
+		mNode := node.(*mockenv.MockServiceNode)
 		if calls.expectSetup {
-			mInst.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
+			mNode.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 		}
 		if calls.expectTeardown {
-			mInst.EXPECT().Teardown().AnyTimes().Return(nil)
+			mNode.EXPECT().Teardown().AnyTimes().Return(nil)
 		}
 		if calls.expectStop {
-			mInst.EXPECT().Stop().AnyTimes().Return(nil)
+			mNode.EXPECT().Stop().AnyTimes().Return(nil)
 		}
 		if calls.expectStart {
-			mInst.EXPECT().Start().AnyTimes().Return(nil)
+			mNode.EXPECT().Start().AnyTimes().Return(nil)
 		}
 	}
-	return instances
+	return nodes
 }
 
-func newMockServiceNodes(ctrl *gomock.Controller, numInstances int) []env.ServiceNode {
-	instances := make([]env.ServiceNode, 0, numInstances)
-	for i := 0; i < numInstances; i++ {
-		instances = append(instances, newMockServiceNode(ctrl))
+func newMockServiceNodes(ctrl *gomock.Controller, numNodes int) []env.ServiceNode {
+	nodes := make([]env.ServiceNode, 0, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodes = append(nodes, newMockServiceNode(ctrl))
 	}
-	return instances
+	return nodes
 }
 
 func newMockPlacementService(ctrl *gomock.Controller) services.PlacementService {
@@ -117,9 +111,8 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 		expectSetup:    true,
 		expectTeardown: true,
 	}
-	instances := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-	mockEnv := newMockEnvironment(ctrl, instances)
-	clusterIface, err := New(mockEnv, opts)
+	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
 	cluster := clusterIface.(*m3dbCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
@@ -152,9 +145,8 @@ func TestClusterUninitializedStatusTransitions(t *testing.T) {
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		expectCalls          = expectInstanceCallTypes{expectSetup: true}
-		instances            = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-		mockEnv              = newMockEnvironment(ctrl, instances)
-		clusterIface, err    = New(mockEnv, opts)
+		nodes                = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+		clusterIface, err    = New(nodes, opts)
 	)
 	require.NoError(t, err)
 	cluster := clusterIface.(*m3dbCluster)
@@ -189,9 +181,8 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 			expectSetup:    true,
 			expectTeardown: true,
 		}
-		instances    = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-		mockEnv      = newMockEnvironment(ctrl, instances)
-		cluster, err = New(mockEnv, opts)
+		nodes        = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+		cluster, err = New(nodes, opts)
 	)
 
 	require.NoError(t, err)
@@ -237,9 +228,8 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 		expectStop:     true,
 	}
 
-	instances := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-	mockEnv := newMockEnvironment(ctrl, instances)
-	clusterIface, err := New(mockEnv, opts)
+	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
 	cluster := clusterIface.(*m3dbCluster)
 	cluster.status = ClusterStatusRunning
@@ -293,9 +283,8 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 		expectStart:    true,
 	}
 
-	instances := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-	mockEnv := newMockEnvironment(ctrl, instances)
-	clusterIface, err := New(mockEnv, opts)
+	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
 	cluster := clusterIface.(*m3dbCluster)
 	cluster.status = ClusterStatusInitialized
@@ -350,14 +339,13 @@ func TestClusterSetup(t *testing.T) {
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		instances            = newMockServiceNodes(ctrl, 5)
+		nodes                = newMockServiceNodes(ctrl, 5)
 	)
-	for _, node := range instances {
+	for _, node := range nodes {
 		mi := node.(*mockenv.MockServiceNode)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
-	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster, err := New(mockEnv, opts)
+	cluster, err := New(nodes, opts)
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
@@ -374,14 +362,13 @@ func TestClusterInitialize(t *testing.T) {
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		instances            = newMockServiceNodes(ctrl, 5)
+		nodes                = newMockServiceNodes(ctrl, 5)
 	)
-	for _, node := range instances {
+	for _, node := range nodes {
 		mi := node.(*mockenv.MockServiceNode)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
-	mockEnv := newMockEnvironment(ctrl, instances)
-	cluster, err := New(mockEnv, opts)
+	cluster, err := New(nodes, opts)
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
@@ -394,19 +381,19 @@ func TestClusterInitialize(t *testing.T) {
 	require.Error(t, err)
 
 	mpsvc.EXPECT().BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-	usedInstances, err := cluster.Initialize(4)
+	usedNodes, err := cluster.Initialize(4)
 	require.NoError(t, err)
-	require.Equal(t, 4, len(usedInstances))
+	require.Equal(t, 4, len(usedNodes))
 
 	spares := cluster.Spares()
 	require.Equal(t, 1, len(spares))
 	spare := spares[0]
-	for _, node := range usedInstances {
+	for _, node := range usedNodes {
 		require.NotEqual(t, node.ID(), spare.ID())
 	}
 
 	// test StartInitialized
-	for _, node := range instances {
+	for _, node := range nodes {
 		if spare.ID() != node.ID() {
 			mi := node.(*mockenv.MockServiceNode)
 			mi.EXPECT().Start().Return(nil)
