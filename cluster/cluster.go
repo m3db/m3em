@@ -256,35 +256,6 @@ func (c *m3dbCluster) Spares() []env.M3DBInstance {
 	return c.spares
 }
 
-func (c *m3dbCluster) Reset() error {
-	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized &&
-		status != ClusterStatusSetup && status != ClusterStatusError {
-		return errClusterUnableToReset
-	}
-
-	var (
-		lock      sync.Mutex
-		instances = c.env.Instances()
-		multiErr  xerrors.MultiError
-	)
-
-	// setup the instances, in parallel
-	executor := newConcurrentInstanceExecutor(instances, c.copts.InstanceConcurrency(), func(inst env.M3DBInstance) {
-		if err := inst.Reset(); err != nil {
-			lock.Lock()
-			multiErr = multiErr.Add(err)
-			lock.Unlock()
-			return
-		}
-		lock.Lock()
-		c.spares = append(c.spares, inst)
-		lock.Unlock()
-	})
-	executor.run()
-
-	return c.markStatus(ClusterStatusSetup, multiErr.FinalError())
-}
-
 func (c *m3dbCluster) markStatus(status Status, err error) error {
 	c.statusLock.Lock()
 	defer c.statusLock.Unlock()

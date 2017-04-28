@@ -114,10 +114,6 @@ type Cluster interface {
 	// cluster (i.e. placement).
 	Spares() []env.M3DBInstance
 
-	// Reset sets the Cluster back to the state after Setup() was called.
-	// i.e. it resets placement, and cleans up resources (directories, processes) on the hosts.
-	Reset() error
-
 	// Teardown releases the resources acquired during Setup().
 	Teardown() error
 

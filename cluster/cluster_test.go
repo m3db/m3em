@@ -72,7 +72,6 @@ func newMockM3DBInstance(ctrl *gomock.Controller) env.M3DBInstance {
 type expectInstanceCallTypes struct {
 	expectSetup    bool
 	expectTeardown bool
-	expectReset    bool
 	expectStop     bool
 	expectStart    bool
 }
@@ -82,9 +81,6 @@ func addDefaultStatusExpects(instances []env.M3DBInstance, calls expectInstanceC
 		mInst := inst.(*env.MockM3DBInstance)
 		if calls.expectSetup {
 			mInst.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-		}
-		if calls.expectReset {
-			mInst.EXPECT().Reset().AnyTimes().Return(nil)
 		}
 		if calls.expectTeardown {
 			mInst.EXPECT().Teardown().AnyTimes().Return(nil)
@@ -117,7 +113,6 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	mockPlacementService := newMockPlacementService(ctrl)
 	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
 	expectCalls := expectInstanceCallTypes{
-		expectReset:    true,
 		expectSetup:    true,
 		expectTeardown: true,
 	}
@@ -146,9 +141,6 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	// teardown (legal)
 	require.NoError(t, cluster.Teardown())
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
-	cluster.status = ClusterStatusError
-	require.NoError(t, cluster.Reset())
-	require.Equal(t, ClusterStatusSetup, cluster.Status())
 }
 
 func TestClusterUninitializedStatusTransitions(t *testing.T) {
@@ -195,7 +187,6 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 		expectCalls          = expectInstanceCallTypes{
 			expectSetup:    true,
 			expectTeardown: true,
-			expectReset:    true,
 		}
 		instances    = addDefaultStatusExpects(newMockM3DBInstances(ctrl, 5), expectCalls)
 		mockEnv      = newMockEnvironment(ctrl, instances)
@@ -227,13 +218,9 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(insts))
 
-	// reset (legal)
+	// teardown (legal)
 	mCluster := cluster.(*m3dbCluster)
 	mCluster.status = ClusterStatusSetup
-	require.NoError(t, mCluster.Reset())
-	require.Equal(t, ClusterStatusSetup, mCluster.Status())
-
-	// teardown (legal)
 	require.NoError(t, mCluster.Teardown())
 	require.Equal(t, ClusterStatusUninitialized, mCluster.Status())
 }
@@ -246,7 +233,6 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	expectCalls := expectInstanceCallTypes{
 		expectSetup:    true,
 		expectTeardown: true,
-		expectReset:    true,
 		expectStop:     true,
 	}
 
@@ -263,11 +249,6 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	require.Error(t, cluster.StartInitialized())
 	_, err = cluster.Initialize(1)
 	require.Error(t, err)
-
-	// reset (legal)
-	cluster.status = ClusterStatusRunning
-	require.NoError(t, cluster.Reset())
-	require.Equal(t, ClusterStatusSetup, cluster.Status())
 
 	// stop (legal)
 	cluster.status = ClusterStatusRunning
@@ -308,7 +289,6 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
 	expectCalls := expectInstanceCallTypes{
 		expectTeardown: true,
-		expectReset:    true,
 		expectStart:    true,
 	}
 
@@ -324,11 +304,6 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	require.Error(t, cluster.Stop())
 	_, err = cluster.Initialize(1)
 	require.Error(t, err)
-
-	// reset (legal)
-	cluster.status = ClusterStatusInitialized
-	require.NoError(t, cluster.Reset())
-	require.Equal(t, ClusterStatusSetup, cluster.Status())
 
 	// start (legal)
 	cluster.status = ClusterStatusInitialized
