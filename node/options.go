@@ -44,10 +44,10 @@ type nodeOpts struct {
 	opClientFn         OperatorClientFn
 }
 
-// NewOptions returns a new NodeOptions construct.
+// NewOptions returns a new Options construct.
 func NewOptions(
 	opts instrument.Options,
-) NodeOptions {
+) Options {
 	if opts == nil {
 		opts = instrument.NewOptions()
 	}
@@ -73,7 +73,7 @@ func (o *nodeOpts) Validate() error {
 	return o.hOpts.Validate()
 }
 
-func (o *nodeOpts) SetInstrumentOptions(io instrument.Options) NodeOptions {
+func (o *nodeOpts) SetInstrumentOptions(io instrument.Options) Options {
 	o.iopts = io
 	return o
 }
@@ -82,7 +82,7 @@ func (o *nodeOpts) InstrumentOptions() instrument.Options {
 	return o.iopts
 }
 
-func (o *nodeOpts) SetRetrier(retrier xretry.Retrier) NodeOptions {
+func (o *nodeOpts) SetRetrier(retrier xretry.Retrier) Options {
 	o.retrier = retrier
 	return o
 }
@@ -91,7 +91,7 @@ func (o *nodeOpts) Retrier() xretry.Retrier {
 	return o.retrier
 }
 
-func (o *nodeOpts) SetOperationTimeout(d time.Duration) NodeOptions {
+func (o *nodeOpts) SetOperationTimeout(d time.Duration) Options {
 	o.operationTimeout = d
 	return o
 }
@@ -100,7 +100,7 @@ func (o *nodeOpts) OperationTimeout() time.Duration {
 	return o.operationTimeout
 }
 
-func (o *nodeOpts) SetTransferBufferSize(sz int) NodeOptions {
+func (o *nodeOpts) SetTransferBufferSize(sz int) Options {
 	o.transferBufferSize = sz
 	return o
 }
@@ -109,7 +109,7 @@ func (o *nodeOpts) TransferBufferSize() int {
 	return o.transferBufferSize
 }
 
-func (o *nodeOpts) SetHeartbeatOptions(ho HeartbeatOptions) NodeOptions {
+func (o *nodeOpts) SetHeartbeatOptions(ho HeartbeatOptions) Options {
 	o.hOpts = ho
 	return o
 }
@@ -118,7 +118,7 @@ func (o *nodeOpts) HeartbeatOptions() HeartbeatOptions {
 	return o.hOpts
 }
 
-func (o *nodeOpts) SetOperatorClientFn(fn OperatorClientFn) NodeOptions {
+func (o *nodeOpts) SetOperatorClientFn(fn OperatorClientFn) Options {
 	o.opClientFn = fn
 	return o
 }

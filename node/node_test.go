@@ -31,7 +31,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
-	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
@@ -62,7 +61,7 @@ func newMockPlacementInstances(ctrl *gomock.Controller, numInstances int) []serv
 	return svcs
 }
 
-func newTestNodeOptions(c *m3em.MockOperatorClient) NodeOptions {
+func newTestOptions(c *m3em.MockOperatorClient) Options {
 	return NewOptions(nil).
 		SetOperatorClientFn(func() (*grpc.ClientConn, m3em.OperatorClient, error) {
 			return nil, c, nil
@@ -73,7 +72,7 @@ func TestNodePropertyInitialization(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	opts := newTestNodeOptions(nil)
+	opts := newTestOptions(nil)
 	mockInstance := newMockPlacementInstance(ctrl)
 	serviceNode, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -89,7 +88,7 @@ func TestNodeErrorStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -105,7 +104,7 @@ func TestNodeErrorStatusToTeardownTransition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -121,7 +120,7 @@ func TestNodeUninitializedStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -136,7 +135,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mb := build.NewMockServiceBuild(ctrl)
 	mc := build.NewMockServiceConfiguration(ctrl)
 	mockInstance := newMockPlacementInstance(ctrl)
@@ -230,7 +229,7 @@ func TestNodeSetupStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -243,7 +242,7 @@ func TestNodeSetupStatusToStartTransition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -258,7 +257,7 @@ func TestNodeSetupStatusToTeardownTransition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -273,7 +272,7 @@ func TestNodeRunningStatusIllegalTransitions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -287,7 +286,7 @@ func TestNodeRunningStatusToStopTransition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -302,7 +301,7 @@ func TestNodeRunningStatusToTeardownTransition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockClient := m3em.NewMockOperatorClient(ctrl)
-	opts := newTestNodeOptions(mockClient)
+	opts := newTestOptions(mockClient)
 	mockInstance := newMockPlacementInstance(ctrl)
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
@@ -312,28 +311,4 @@ func TestNodeRunningStatusToTeardownTransition(t *testing.T) {
 	require.NoError(t, serviceNode.Teardown())
 	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
 
-}
-
-func TestHealthEndpoint(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockM3DBClient := m3dbrpc.NewMockTChanNode(ctrl)
-	mockM3DBClient.EXPECT().Health(gomock.Any()).Return(&m3dbrpc.NodeHealthResult_{
-		Bootstrapped: true,
-		Ok:           false,
-		Status:       "NOT_OK",
-	}, nil)
-
-	opts := newTestNodeOptions(nil)
-	mockInstance := newMockPlacementInstance(ctrl)
-	node, err := New(mockInstance, opts)
-	require.NoError(t, err)
-	serviceNode := node.(*svcNode)
-	serviceNode.m3dbClient = mockM3DBClient
-
-	health, err := serviceNode.Health()
-	require.NoError(t, err)
-	require.True(t, health.Bootstrapped)
-	require.False(t, health.OK)
-	require.Equal(t, "NOT_OK", health.Status)
 }

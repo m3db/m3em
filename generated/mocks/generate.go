@@ -24,7 +24,7 @@
 
 // mockgen rules for generating mocks for exported interfaces (reflection mode). TBH this mode is sketch af.
 // (1) node package mocks
-//go:generate sh -c "mockgen -package=node -destination=$GOPATH/src/$PACKAGE/node/mocks/mock_node.go github.com/m3db/m3em/node ServiceNode,NodeOptions"
+//go:generate sh -c "mockgen -package=node -destination=$GOPATH/src/$PACKAGE/node/mocks/mock_node.go github.com/m3db/m3em/node ServiceNode,Options"
 //- delete the vendor prefix due to https://github.com/golang/mock/issues/30
 //go:generate sed -i "" s@github.com/m3db/m3em/vendor/@@g $GOPATH/src/$PACKAGE/node/mocks/mock_node.go
 // (2) m3em proto package mocks

@@ -114,15 +114,6 @@ type ServiceNode interface {
 	// DeregisterListener un-registers an event listener
 	DeregisterListener(ListenerID)
 
-	// Health returns the health for this ServiceNode
-	Health() (ServiceNodeHealth, error)
-
-	// TODO(prateek): add more m3db service endpoints in ServiceNode
-	// - query service observable properties (nowFn, detailed_status)
-	// - set nowFn offset
-	// - logs
-	// - metrics
-
 	// TODO(prateek): add operator operations for -
 	// CleanDataDirectory() error
 	// ListDataDirectory(recursive bool, includeContents bool) ([]DirEntry, error)
@@ -159,19 +150,12 @@ type Listener interface {
 	OnOverwrite(node ServiceNode, desc string)
 }
 
-// ServiceNodeHealth provides ServiceNode Health
-type ServiceNodeHealth struct {
-	Bootstrapped bool
-	Status       string
-	OK           bool
-}
-
 // ServiceNodes is a collection of ServiceNode(s)
 type ServiceNodes []ServiceNode
 
-// Options are the knobs used to tweak Environment interactions
+// Options are the various knobs to control Node behavior
 type Options interface {
-	// Validate validates the Options
+	// Validate validates the NodeOptions
 	Validate() error
 
 	// SetInstrumentOptions sets the instrumentation options
@@ -180,56 +164,32 @@ type Options interface {
 	// InstrumentOptions returns the instrumentation options
 	InstrumentOptions() instrument.Options
 
-	// TODO(prateek-ref): migrate to ClusterOptions
-	// // SetListener sets the ServiceNodeListener
-	// SetListener(ServiceNodeListener) Options
-	// // Listener returns the ServiceNodeListener
-	// Listener() ServiceNodeListener
-
-	// SetNodeOptions sets the NodeOptions
-	SetNodeOptions(NodeOptions) Options
-
-	// NodeOptions returns the NodeOptions
-	NodeOptions() NodeOptions
-}
-
-// NodeOptions are the various knobs to control Node behavior
-type NodeOptions interface {
-	// Validate validates the NodeOptions
-	Validate() error
-
-	// SetInstrumentOptions sets the instrumentation options
-	SetInstrumentOptions(instrument.Options) NodeOptions
-
-	// InstrumentOptions returns the instrumentation options
-	InstrumentOptions() instrument.Options
-
 	// SetOperationTimeout returns the timeout for node operations
-	SetOperationTimeout(time.Duration) NodeOptions
+	SetOperationTimeout(time.Duration) Options
 
 	// OperationTimeout returns the timeout for node operations
 	OperationTimeout() time.Duration
 
 	// SetRetrier sets the retrier for node operations
-	SetRetrier(xretry.Retrier) NodeOptions
+	SetRetrier(xretry.Retrier) Options
 
 	// OperationRetrier returns the retrier for node operations
 	Retrier() xretry.Retrier
 
 	// SetTransferBufferSize sets the bytes buffer size used during file transfer
-	SetTransferBufferSize(int) NodeOptions
+	SetTransferBufferSize(int) Options
 
 	// TransferBufferSize returns the bytes buffer size used during file transfer
 	TransferBufferSize() int
 
 	// SetHeartbeatOptions sets the HeartbeatOptions
-	SetHeartbeatOptions(HeartbeatOptions) NodeOptions
+	SetHeartbeatOptions(HeartbeatOptions) Options
 
 	// HeartbeatOptions returns the HeartbeatOptions
 	HeartbeatOptions() HeartbeatOptions
 
 	// SetOperatorClientFn sets the OperatorClientFn
-	SetOperatorClientFn(OperatorClientFn) NodeOptions
+	SetOperatorClientFn(OperatorClientFn) Options
 
 	// OperatorClientFn returns the OperatorClientFn
 	OperatorClientFn() OperatorClientFn

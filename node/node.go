@@ -25,21 +25,16 @@ import (
 	"fmt"
 	"sync"
 
-	"google.golang.org/grpc"
-
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	mtime "github.com/m3db/m3em/time"
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3cluster/shard"
-	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
-	m3dbchannel "github.com/m3db/m3db/network/server/tchannelthrift/node/channel"
 	xerrors "github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 	gu "github.com/nu7hatch/gouuid"
-	tchannel "github.com/uber/tchannel-go"
-	"github.com/uber/tchannel-go/thrift"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -54,7 +49,7 @@ var (
 type svcNode struct {
 	sync.Mutex
 	logger            xlog.Logger
-	opts              NodeOptions
+	opts              Options
 	id                string
 	rack              string
 	zone              string
@@ -70,14 +65,12 @@ type svcNode struct {
 	heartbeater       *opHeartbeatServer
 	operatorUUID      string
 	heartbeatEndpoint string
-
-	m3dbClient m3dbrpc.TChanNode
 }
 
 // New returns a new ServiceNode.
 func New(
 	node services.PlacementInstance,
-	opts NodeOptions,
+	opts Options,
 ) (ServiceNode, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
@@ -438,46 +431,4 @@ func (i *svcNode) RegisterListener(l Listener) ListenerID {
 
 func (i *svcNode) DeregisterListener(token ListenerID) {
 	i.listeners.remove(int(token))
-}
-
-func (i *svcNode) thriftClient() (m3dbrpc.TChanNode, error) {
-	i.Lock()
-	defer i.Unlock()
-	if i.m3dbClient != nil {
-		return i.m3dbClient, nil
-	}
-	channel, err := tchannel.NewChannel("Client", nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not create new tchannel channel: %v", err)
-	}
-	endpoint := &thrift.ClientOptions{HostPort: i.endpoint}
-	thriftClient := thrift.NewClient(channel, m3dbchannel.ChannelName, endpoint)
-	client := m3dbrpc.NewTChanNodeClient(thriftClient)
-	i.m3dbClient = client
-	return i.m3dbClient, nil
-}
-
-func (i *svcNode) Health() (ServiceNodeHealth, error) {
-	healthResult := ServiceNodeHealth{}
-
-	client, err := i.thriftClient()
-	if err != nil {
-		return healthResult, err
-	}
-
-	attemptFn := func() error {
-		tctx, _ := thrift.NewContext(i.opts.OperationTimeout())
-		result, err := client.Health(tctx)
-		if err != nil {
-			return err
-		}
-		healthResult.Bootstrapped = result.GetBootstrapped()
-		healthResult.OK = result.GetOk()
-		healthResult.Status = result.GetStatus()
-		return nil
-	}
-
-	retrier := i.opts.Retrier()
-	err = retrier.Attempt(attemptFn)
-	return healthResult, err
 }
