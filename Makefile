@@ -51,7 +51,7 @@ prod-services:
 $(foreach SERVICE,$(SERVICES),$(eval $(SERVICE_RULES)))
 
 all: lint test-ci-unit test-ci-integration services
-	@echo Make all succsessfully
+	@echo Made all successfully
 
 lint:
 	@which golint > /dev/null || go get -u github.com/golang/lint/golint
