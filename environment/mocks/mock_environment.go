@@ -212,9 +212,9 @@ func (_mr *_MockM3DBInstanceRecorder) Start() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Start")
 }
 
-func (_m *MockM3DBInstance) Status() environment.InstanceStatus {
+func (_m *MockM3DBInstance) Status() environment.NodeStatus {
 	ret := _m.ctrl.Call(_m, "Status")
-	ret0, _ := ret[0].(environment.InstanceStatus)
+	ret0, _ := ret[0].(environment.NodeStatus)
 	return ret0
 }
 
@@ -313,9 +313,9 @@ func (_mr *_MockM3DBEnvironmentRecorder) InstancesByID() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstancesByID")
 }
 
-func (_m *MockM3DBEnvironment) Status() map[string]environment.InstanceStatus {
+func (_m *MockM3DBEnvironment) Status() map[string]environment.NodeStatus {
 	ret := _m.ctrl.Call(_m, "Status")
-	ret0, _ := ret[0].(map[string]environment.InstanceStatus)
+	ret0, _ := ret[0].(map[string]environment.NodeStatus)
 	return ret0
 }
 

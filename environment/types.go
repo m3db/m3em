@@ -34,7 +34,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// InstanceStatus indicates the different states a ServiceInstance can be in. The
+// NodeStatus indicates the different states a ServiceInstance can be in. The
 // state diagram below describes the transitions between the various states:
 //
 //                           ┌──────────────────┐
@@ -63,20 +63,20 @@ import (
 //           └────────────────────│     Running      │────────────Reset()
 //                                │                  │
 //                                └──────────────────┘
-type InstanceStatus int
+type NodeStatus int
 
 const (
-	// InstanceStatusUninitialized refers to the state of an un-initialized instance.
-	InstanceStatusUninitialized InstanceStatus = iota
+	// NodeStatusUninitialized refers to the state of an un-initialized instance.
+	NodeStatusUninitialized NodeStatus = iota
 
-	// InstanceStatusSetup is the state of an instance which has been Setup()
-	InstanceStatusSetup
+	// NodeStatusSetup is the state of an instance which has been Setup()
+	NodeStatusSetup
 
-	// InstanceStatusRunning is the state of an instance which has been Start()-ed
-	InstanceStatusRunning
+	// NodeStatusRunning is the state of an instance which has been Start()-ed
+	NodeStatusRunning
 
-	// InstanceStatusError is the state of an instance which is in an Error state
-	InstanceStatusError
+	// NodeStatusError is the state of an instance which is in an Error state
+	NodeStatusError
 )
 
 // M3DBEnvironment represents a collection of M3DBInstance objects,
@@ -90,7 +90,7 @@ type M3DBEnvironment interface {
 	InstancesByID() map[string]M3DBInstance
 
 	// Status returns map from instance ID to Status.
-	Status() map[string]InstanceStatus
+	Status() map[string]NodeStatus
 }
 
 // M3DBInstance represents a testable instance of M3DB. It controls both the service
@@ -115,7 +115,7 @@ type M3DBInstance interface {
 	Stop() error
 
 	// Status returns the ServiceInstance status.
-	Status() InstanceStatus
+	Status() NodeStatus
 
 	// Teardown releases any remote resources used for testing.
 	Teardown() error

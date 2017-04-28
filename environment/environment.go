@@ -53,8 +53,8 @@ func (u *m3dbEnv) InstancesByID() map[string]M3DBInstance {
 	return u.instanceMap
 }
 
-func (u *m3dbEnv) Status() map[string]InstanceStatus {
-	statusMap := make(map[string]InstanceStatus, len(u.instanceMap))
+func (u *m3dbEnv) Status() map[string]NodeStatus {
+	statusMap := make(map[string]NodeStatus, len(u.instanceMap))
 	for id, inst := range u.instanceMap {
 		statusMap[id] = inst.Status()
 	}
