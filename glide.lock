@@ -1,7 +1,8 @@
 hash: fa4a61e16b0de60cce29addb7f78179db6026a5a02693bb35f38e0eb874618ee
-updated: 2017-04-28T16:32:52.234126617-04:00
+updated: 2017-05-01T13:46:37.813269833-04:00
 imports:
 - name: github.com/apache/thrift
+  version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
   subpackages:
   - lib/go/thrift
 - name: github.com/davecgh/go-spew
@@ -38,6 +39,11 @@ imports:
   - services
   - services/placement
   - shard
+- name: github.com/m3db/m3db
+  version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
+  subpackages:
+  - generated/thrift/rpc
+  - network/server/tchannelthrift/node/channel
 - name: github.com/m3db/m3x
   version: 3a8328d65b7880b034b8515177921023b41e4399
   subpackages:
@@ -54,6 +60,10 @@ imports:
   version: 53818660ed4955e899c0bcafa97299a388bd7c8e
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: github.com/opentracing/opentracing-go
+  version: 855519783f479520497c6b3445611b05fc42f009
+  subpackages:
+  - ext
 - name: github.com/pborman/getopt
   version: ec82d864f599c39673eef89f91b93fa5576567a1
 - name: github.com/pelletier/go-buffruneio
@@ -90,6 +100,15 @@ imports:
   - m3/customtransports
   - m3/thrift
   - m3/thriftudp
+- name: github.com/uber/tchannel-go
+  version: 8d570ed87acb2661d390c096215260f3f9e9b931
+  subpackages:
+  - relay
+  - thrift
+  - thrift/gen-go/meta
+  - tnet
+  - trand
+  - typed
 - name: golang.org/x/net
   version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:
