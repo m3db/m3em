@@ -269,13 +269,13 @@ func (i *svcNode) Setup(
 
 	// transfer build
 	if err := i.opts.Retrier().Attempt(func() error {
-		return i.sendFile(bld, m3em.FileType_M3DB_BINARY, force)
+		return i.sendFile(bld, m3em.FileType_SERVICE_BINARY, force)
 	}); err != nil {
 		return fmt.Errorf("unable to transfer build: %v", err)
 	}
 
 	if err := i.opts.Retrier().Attempt(func() error {
-		return i.sendFile(conf, m3em.FileType_M3DB_CONFIG, force)
+		return i.sendFile(conf, m3em.FileType_SERVICE_CONFIG, force)
 	}); err != nil {
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}

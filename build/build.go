@@ -41,7 +41,7 @@ func (b *svcBuild) SourcePath() string {
 	return b.sourcePath
 }
 
-// NewServiceBuild constructs a new ServiceBuild representing an M3DB build
+// NewServiceBuild constructs a new ServiceBuild representing a Service build
 func NewServiceBuild(id string, sourcePath string) ServiceBuild {
 	return &svcBuild{
 		id:         id,
@@ -74,7 +74,7 @@ func (c *svcConfig) UnmarshalText(b []byte) error {
 	panic("not implemented")
 }
 
-// NewServiceConfig returns a new M3DB configuration
+// NewServiceConfig returns a new Service Configuration
 func NewServiceConfig(id string, marshalledBytes []byte) ServiceConfiguration {
 	return &svcConfig{
 		id:    id,

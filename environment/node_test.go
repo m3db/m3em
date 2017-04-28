@@ -178,14 +178,14 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	buildTransferClient := m3em.NewMockOperator_TransferClient(ctrl)
 	gomock.InOrder(
 		buildTransferClient.EXPECT().Send(&m3em.TransferRequest{
-			Type:       m3em.FileType_M3DB_BINARY,
+			Type:       m3em.FileType_SERVICE_BINARY,
 			Filename:   "build-id",
 			Overwrite:  forceSetup,
 			ChunkBytes: dummyBytes,
 			ChunkIdx:   0,
 		}).Return(nil),
 		buildTransferClient.EXPECT().Send(&m3em.TransferRequest{
-			Type:       m3em.FileType_M3DB_BINARY,
+			Type:       m3em.FileType_SERVICE_BINARY,
 			Filename:   "build-id",
 			Overwrite:  forceSetup,
 			ChunkBytes: dummyBytes,
@@ -201,7 +201,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	configTransferClient := m3em.NewMockOperator_TransferClient(ctrl)
 	gomock.InOrder(
 		configTransferClient.EXPECT().Send(&m3em.TransferRequest{
-			Type:       m3em.FileType_M3DB_CONFIG,
+			Type:       m3em.FileType_SERVICE_CONFIG,
 			Filename:   "config-id",
 			Overwrite:  forceSetup,
 			ChunkBytes: dummyBytes,

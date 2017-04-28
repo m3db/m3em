@@ -11,9 +11,9 @@ service Operator {
 }
 
 enum FileType {
-  UNKNOWN     = 0;
-  M3DB_BINARY = 1;
-  M3DB_CONFIG = 2;
+  UNKNOWN        = 0;
+  SERVICE_BINARY = 1;
+  SERVICE_CONFIG = 2;
   // log file
 }
 

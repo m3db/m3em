@@ -148,7 +148,7 @@ func (o *opAgent) initFile(
 	}
 
 	perms := os.FileMode(0644)
-	if fileType == m3em.FileType_M3DB_BINARY {
+	if fileType == m3em.FileType_SERVICE_BINARY {
 		perms = os.FileMode(0755)
 	}
 	return os.OpenFile(targetFile, flags, perms)
@@ -161,9 +161,9 @@ func (o *opAgent) markFileDone(
 	o.Lock()
 	defer o.Unlock()
 	switch fileType {
-	case m3em.FileType_M3DB_BINARY:
+	case m3em.FileType_SERVICE_BINARY:
 		o.executablePath = filename
-	case m3em.FileType_M3DB_CONFIG:
+	case m3em.FileType_SERVICE_CONFIG:
 		o.configPath = filename
 	default:
 		o.logger.Warnf("received unknown fileType: %v, filename: %s", fileType, filename)
