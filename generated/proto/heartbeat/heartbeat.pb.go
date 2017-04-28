@@ -49,7 +49,7 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
+// is compatible with the proto package it is being compiled aganode.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
@@ -140,7 +140,7 @@ var _ context.Context
 var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
+// is compatible with the grpc package it is being compiled aganode.
 const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Heartbeater service

@@ -60,14 +60,14 @@ func newMockEnvironment(ctrl *gomock.Controller, instances env.ServiceNodes) env
 
 func newMockServiceNode(ctrl *gomock.Controller) env.ServiceNode {
 	r := defaultRandomVar
-	inst := mockenv.NewMockServiceNode(ctrl)
-	inst.EXPECT().ID().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
-	inst.EXPECT().Rack().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
-	inst.EXPECT().Endpoint().AnyTimes().Return(fmt.Sprintf("%v:%v", r.Int(), r.Int()))
-	inst.EXPECT().Zone().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
-	inst.EXPECT().Weight().AnyTimes().Return(uint32(r.Int()))
-	inst.EXPECT().Shards().AnyTimes().Return(nil)
-	return inst
+	node := mockenv.NewMockServiceNode(ctrl)
+	node.EXPECT().ID().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
+	node.EXPECT().Rack().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
+	node.EXPECT().Endpoint().AnyTimes().Return(fmt.Sprintf("%v:%v", r.Int(), r.Int()))
+	node.EXPECT().Zone().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
+	node.EXPECT().Weight().AnyTimes().Return(uint32(r.Int()))
+	node.EXPECT().Shards().AnyTimes().Return(nil)
+	return node
 }
 
 type expectInstanceCallTypes struct {
@@ -78,8 +78,8 @@ type expectInstanceCallTypes struct {
 }
 
 func addDefaultStatusExpects(instances []env.ServiceNode, calls expectInstanceCallTypes) []env.ServiceNode {
-	for _, inst := range instances {
-		mInst := inst.(*mockenv.MockServiceNode)
+	for _, node := range instances {
+		mInst := node.(*mockenv.MockServiceNode)
 		if calls.expectSetup {
 			mInst.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 		}
@@ -352,8 +352,8 @@ func TestClusterSetup(t *testing.T) {
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		instances            = newMockServiceNodes(ctrl, 5)
 	)
-	for _, inst := range instances {
-		mi := inst.(*mockenv.MockServiceNode)
+	for _, node := range instances {
+		mi := node.(*mockenv.MockServiceNode)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
@@ -376,8 +376,8 @@ func TestClusterInitialize(t *testing.T) {
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		instances            = newMockServiceNodes(ctrl, 5)
 	)
-	for _, inst := range instances {
-		mi := inst.(*mockenv.MockServiceNode)
+	for _, node := range instances {
+		mi := node.(*mockenv.MockServiceNode)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
@@ -401,14 +401,14 @@ func TestClusterInitialize(t *testing.T) {
 	spares := cluster.Spares()
 	require.Equal(t, 1, len(spares))
 	spare := spares[0]
-	for _, inst := range usedInstances {
-		require.NotEqual(t, inst.ID(), spare.ID())
+	for _, node := range usedInstances {
+		require.NotEqual(t, node.ID(), spare.ID())
 	}
 
 	// test StartInitialized
-	for _, inst := range instances {
-		if spare.ID() != inst.ID() {
-			mi := inst.(*mockenv.MockServiceNode)
+	for _, node := range instances {
+		if spare.ID() != node.ID() {
+			mi := node.(*mockenv.MockServiceNode)
 			mi.EXPECT().Start().Return(nil)
 		}
 	}

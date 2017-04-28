@@ -164,14 +164,14 @@ type ListenerID int
 // Listener provides callbacks invoked upon remote process state transitions
 type Listener interface {
 	// OnProcessTerminate is invoked when the remote process being run terminates
-	OnProcessTerminate(inst ServiceNode, desc string)
+	OnProcessTerminate(node ServiceNode, desc string)
 
 	// OnHeartbeatTimeout is invoked upon remote heartbeats having timed-out
-	OnHeartbeatTimeout(inst ServiceNode, lastHeartbeatTs time.Time)
+	OnHeartbeatTimeout(node ServiceNode, lastHeartbeatTs time.Time)
 
 	// OnOverwrite is invoked if remote agent control is overwritten by another
 	// coordinator
-	OnOverwrite(inst ServiceNode, desc string)
+	OnOverwrite(node ServiceNode, desc string)
 }
 
 // ServiceNodeHealth provides ServiceNode Health

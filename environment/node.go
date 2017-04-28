@@ -76,7 +76,7 @@ type svcNode struct {
 
 // NewServiceNode returns a new ServiceNode.
 func NewServiceNode(
-	inst services.PlacementInstance,
+	node services.PlacementInstance,
 	opts NodeOptions,
 ) (ServiceNode, error) {
 	if err := opts.Validate(); err != nil {
@@ -112,12 +112,12 @@ func NewServiceNode(
 	retInst := &svcNode{
 		logger:            opts.InstrumentOptions().Logger(),
 		opts:              opts,
-		id:                inst.ID(),
-		rack:              inst.Rack(),
-		zone:              inst.Zone(),
-		weight:            inst.Weight(),
-		endpoint:          inst.Endpoint(),
-		shards:            inst.Shards(),
+		id:                node.ID(),
+		rack:              node.Rack(),
+		zone:              node.Zone(),
+		weight:            node.Weight(),
+		endpoint:          node.Endpoint(),
+		shards:            node.Shards(),
 		status:            NodeStatusUninitialized,
 		listeners:         listeners,
 		client:            client,
