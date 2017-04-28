@@ -98,16 +98,17 @@ type Cluster interface {
 	// Initialize initializes service placement for the specified numNodes.
 	Initialize(numNodes int) ([]env.ServiceNode, error)
 
-	// AddNode adds the specified instance to the service placement. It does
+	// AddNode adds the specified node to the service placement. It does
 	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
 	AddNode() (env.ServiceNode, error)
 
-	// RemoveNode removes the specified instance from the service placement. It does
+	// RemoveNode removes the specified node from the service placement. It does
 	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
 	RemoveNode(env.ServiceNode) error
 
-	// ReplaceNode replaces the specified instance with a new instance in the service
+	// ReplaceNode replaces the specified node with new node(s) in the service
 	// placement. It does NOT alter the state of the TestNode (i.e. does not start/stop it).
+	// TODO(prateek-ref): use new interface for replace
 	ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error)
 
 	// Spares returns the nodes available in the environment which are not part of the

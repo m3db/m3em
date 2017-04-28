@@ -32,9 +32,9 @@ import (
 )
 
 var (
-	errInsufficientCapacity            = fmt.Errorf("insufficient instance capacity in environment")
-	errNodeAlreadyUsed                 = fmt.Errorf("unable to add instance, already in use")
-	errNodeNotInUse                    = fmt.Errorf("unable to remove instance, not in use")
+	errInsufficientCapacity            = fmt.Errorf("insufficient node capacity in environment")
+	errNodeAlreadyUsed                 = fmt.Errorf("unable to add node, already in use")
+	errNodeNotInUse                    = fmt.Errorf("unable to remove node, not in use")
 	errClusterAlreadySetup             = fmt.Errorf("cluster already setup")
 	errClusterUnableToInitialize       = fmt.Errorf("unable to initialize cluster, it needs to be setup")
 	errClusterUnableToAlterPlacement   = fmt.Errorf("unable to alter cluster placement, it needs to be initialized/running")
