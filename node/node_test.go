@@ -93,8 +93,8 @@ func TestNodeErrorStatusIllegalTransitions(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
-	serviceNode.status = NodeStatusError
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
+	serviceNode.status = StatusError
 	require.Error(t, serviceNode.Start())
 	require.Error(t, serviceNode.Stop())
 	require.Error(t, serviceNode.Setup(nil, nil, "", false))
@@ -109,11 +109,11 @@ func TestNodeErrorStatusToTeardownTransition(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
-	serviceNode.status = NodeStatusError
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
+	serviceNode.status = StatusError
 	mockClient.EXPECT().Teardown(gomock.Any(), gomock.Any())
 	require.NoError(t, serviceNode.Teardown())
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
 }
 
 func TestNodeUninitializedStatusIllegalTransitions(t *testing.T) {
@@ -125,7 +125,7 @@ func TestNodeUninitializedStatusIllegalTransitions(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
 	require.Error(t, serviceNode.Start())
 	require.Error(t, serviceNode.Stop())
 	require.Error(t, serviceNode.Teardown())
@@ -142,7 +142,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
 
 	forceSetup := false
 	buildChecksum := uint32(123)
@@ -220,7 +220,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	)
 
 	require.NoError(t, serviceNode.Setup(mb, mc, "", forceSetup))
-	require.Equal(t, NodeStatusSetup, serviceNode.Status())
+	require.Equal(t, StatusSetup, serviceNode.Status())
 	require.Equal(t, mb, serviceNode.currentBuild)
 	require.Equal(t, mc, serviceNode.currentConf)
 }
@@ -234,7 +234,7 @@ func TestNodeSetupStatusIllegalTransitions(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	serviceNode.status = NodeStatusSetup
+	serviceNode.status = StatusSetup
 	require.Error(t, serviceNode.Stop())
 }
 
@@ -247,10 +247,10 @@ func TestNodeSetupStatusToStartTransition(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	serviceNode.status = NodeStatusSetup
+	serviceNode.status = StatusSetup
 	mockClient.EXPECT().Start(gomock.Any(), gomock.Any())
 	require.NoError(t, serviceNode.Start())
-	require.Equal(t, NodeStatusRunning, serviceNode.Status())
+	require.Equal(t, StatusRunning, serviceNode.Status())
 }
 
 func TestNodeSetupStatusToTeardownTransition(t *testing.T) {
@@ -262,10 +262,10 @@ func TestNodeSetupStatusToTeardownTransition(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	serviceNode.status = NodeStatusSetup
+	serviceNode.status = StatusSetup
 	mockClient.EXPECT().Teardown(gomock.Any(), gomock.Any())
 	require.NoError(t, serviceNode.Teardown())
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
 }
 
 func TestNodeRunningStatusIllegalTransitions(t *testing.T) {
@@ -277,7 +277,7 @@ func TestNodeRunningStatusIllegalTransitions(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	serviceNode.status = NodeStatusRunning
+	serviceNode.status = StatusRunning
 	require.Error(t, serviceNode.Start())
 	require.Error(t, serviceNode.Setup(nil, nil, "", false))
 }
@@ -291,10 +291,10 @@ func TestNodeRunningStatusToStopTransition(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	serviceNode.status = NodeStatusRunning
+	serviceNode.status = StatusRunning
 	mockClient.EXPECT().Stop(gomock.Any(), gomock.Any())
 	require.NoError(t, serviceNode.Stop())
-	require.Equal(t, NodeStatusSetup, serviceNode.Status())
+	require.Equal(t, StatusSetup, serviceNode.Status())
 }
 
 func TestNodeRunningStatusToTeardownTransition(t *testing.T) {
@@ -306,9 +306,9 @@ func TestNodeRunningStatusToTeardownTransition(t *testing.T) {
 	node, err := New(mockInstance, opts)
 	require.NoError(t, err)
 	serviceNode := node.(*svcNode)
-	serviceNode.status = NodeStatusRunning
+	serviceNode.status = StatusRunning
 	mockClient.EXPECT().Teardown(gomock.Any(), gomock.Any())
 	require.NoError(t, serviceNode.Teardown())
-	require.Equal(t, NodeStatusUninitialized, serviceNode.Status())
+	require.Equal(t, StatusUninitialized, serviceNode.Status())
 
 }

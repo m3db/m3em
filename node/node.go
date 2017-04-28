@@ -56,7 +56,7 @@ type svcNode struct {
 	weight            uint32
 	endpoint          string
 	shards            shard.Shards
-	status            NodeStatus
+	status            Status
 	currentBuild      build.ServiceBuild
 	currentConf       build.ServiceConfiguration
 	clientConn        *grpc.ClientConn
@@ -111,7 +111,7 @@ func New(
 		weight:            node.Weight(),
 		endpoint:          node.Endpoint(),
 		shards:            node.Shards(),
-		status:            NodeStatusUninitialized,
+		status:            StatusUninitialized,
 		listeners:         listeners,
 		client:            client,
 		clientConn:        clientConn,
@@ -217,8 +217,8 @@ func (i *svcNode) Setup(
 ) error {
 	i.Lock()
 	defer i.Unlock()
-	if i.status != NodeStatusUninitialized &&
-		i.status != NodeStatusSetup {
+	if i.status != StatusUninitialized &&
+		i.status != StatusSetup {
 		return errUnableToSetupInitializedNode
 	}
 
@@ -273,7 +273,7 @@ func (i *svcNode) Setup(
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}
 
-	i.status = NodeStatusSetup
+	i.status = StatusSetup
 	return nil
 }
 
@@ -338,9 +338,9 @@ func (i *svcNode) sendFile(
 func (i *svcNode) Teardown() error {
 	i.Lock()
 	defer i.Unlock()
-	if status := i.status; status != NodeStatusRunning &&
-		status != NodeStatusSetup &&
-		status != NodeStatusError {
+	if status := i.status; status != StatusRunning &&
+		status != StatusSetup &&
+		status != StatusError {
 		return errUnableToTeardownNode
 	}
 
@@ -359,7 +359,7 @@ func (i *svcNode) Teardown() error {
 		return err
 	}
 
-	i.status = NodeStatusUninitialized
+	i.status = StatusUninitialized
 	return nil
 }
 
@@ -384,7 +384,7 @@ func (i *svcNode) Close() error {
 func (i *svcNode) Start() error {
 	i.Lock()
 	defer i.Unlock()
-	if i.status != NodeStatusSetup {
+	if i.status != StatusSetup {
 		return errUnableToStartNode
 	}
 
@@ -396,14 +396,14 @@ func (i *svcNode) Start() error {
 		return err
 	}
 
-	i.status = NodeStatusRunning
+	i.status = StatusRunning
 	return nil
 }
 
 func (i *svcNode) Stop() error {
 	i.Lock()
 	defer i.Unlock()
-	if i.status != NodeStatusRunning {
+	if i.status != StatusRunning {
 		return errUnableToStopNode
 	}
 
@@ -415,11 +415,11 @@ func (i *svcNode) Stop() error {
 		return err
 	}
 
-	i.status = NodeStatusSetup
+	i.status = StatusSetup
 	return nil
 }
 
-func (i *svcNode) Status() NodeStatus {
+func (i *svcNode) Status() Status {
 	i.Lock()
 	defer i.Unlock()
 	return i.status

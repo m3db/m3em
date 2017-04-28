@@ -203,9 +203,9 @@ func (_mr *_MockServiceNodeRecorder) Start() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Start")
 }
 
-func (_m *MockServiceNode) Status() node.NodeStatus {
+func (_m *MockServiceNode) Status() node.Status {
 	ret := _m.ctrl.Call(_m, "Status")
-	ret0, _ := ret[0].(node.NodeStatus)
+	ret0, _ := ret[0].(node.Status)
 	return ret0
 }
 

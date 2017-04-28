@@ -34,7 +34,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// NodeStatus indicates the different states a ServiceNode can be in. The
+// Status indicates the different states a ServiceNode can be in. The
 // state diagram below describes the transitions between the various states:
 //
 //                           ┌──────────────────┐
@@ -63,20 +63,20 @@ import (
 //           └────────────────────│     Running      │────────────Reset()
 //                                │                  │
 //                                └──────────────────┘
-type NodeStatus int
+type Status int
 
 const (
-	// NodeStatusUninitialized refers to the state of an un-initialized node.
-	NodeStatusUninitialized NodeStatus = iota
+	// StatusUninitialized refers to the state of an un-initialized node.
+	StatusUninitialized Status = iota
 
-	// NodeStatusSetup is the state of a node which has been Setup()
-	NodeStatusSetup
+	// StatusSetup is the state of a node which has been Setup()
+	StatusSetup
 
-	// NodeStatusRunning is the state of a node which has been Start()-ed
-	NodeStatusRunning
+	// StatusRunning is the state of a node which has been Start()-ed
+	StatusRunning
 
-	// NodeStatusError is the state of a node which is in an Error state
-	NodeStatusError
+	// StatusError is the state of a node which is in an Error state
+	StatusError
 )
 
 // ServiceNode represents an executable service node. This object controls both the service
@@ -100,7 +100,7 @@ type ServiceNode interface {
 	Stop() error
 
 	// Status returns the ServiceNode status.
-	Status() NodeStatus
+	Status() Status
 
 	// Teardown releases any remote resources used for testing.
 	Teardown() error
