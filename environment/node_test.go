@@ -25,16 +25,15 @@ import (
 	"math/rand"
 	"testing"
 
-	"google.golang.org/grpc"
-
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/generated/proto/m3em"
-	"github.com/m3db/m3em/os/fs"
+	mockfs "github.com/m3db/m3em/os/fs/mocks"
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
 	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 )
 
 const defaultRandSeed = 1234567890
@@ -151,7 +150,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	configChecksum := uint32(321)
 
 	dummyBytes := []byte(`some long string`)
-	dummyBuildIter := fs.NewMockFileReaderIter(ctrl)
+	dummyBuildIter := mockfs.NewMockFileReaderIter(ctrl)
 	gomock.InOrder(
 		dummyBuildIter.EXPECT().Next().Return(true),
 		dummyBuildIter.EXPECT().Current().Return(dummyBytes),
@@ -164,7 +163,7 @@ func TestNodeUninitializedStatusToSetupTransition(t *testing.T) {
 	)
 	mb.EXPECT().ID().Return("build-id")
 	mb.EXPECT().Iter(gomock.Any()).Return(dummyBuildIter, nil)
-	dummyConfIter := fs.NewMockFileReaderIter(ctrl)
+	dummyConfIter := mockfs.NewMockFileReaderIter(ctrl)
 	gomock.InOrder(
 		dummyConfIter.EXPECT().Next().Return(true),
 		dummyConfIter.EXPECT().Current().Return(dummyBytes),

@@ -20,8 +20,7 @@
 
 // mockgen rules for generating mocks for unexported interfaces (file mode)
 //go:generate sh -c "mockgen -package=build -destination=$GOPATH/src/$PACKAGE/build/mock_build.go -source=$GOPATH/src/$PACKAGE/build/types.go"
-//go:generate sh -c "mockgen -package=cluster -destination=$GOPATH/src/$PACKAGE/cluster/mock_cluster.go -source=$GOPATH/src/$PACKAGE/cluster/types.go"
-//go:generate sh -c "mockgen -package=fs -destination=$GOPATH/src/$PACKAGE/os/fs/mock_fs.go -source=$GOPATH/src/$PACKAGE/os/fs/types.go"
+//go:generate sh -c "mockgen -package=fs -destination=$GOPATH/src/$PACKAGE/os/fs/mocks/mock_fs.go -source=$GOPATH/src/$PACKAGE/os/fs/types.go"
 
 // mockgen rules for generating mocks for exported interfaces (reflection mode). TBH this mode is sketch af.
 // (1) environment package mocks
