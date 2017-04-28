@@ -44,12 +44,14 @@ func (l *listener) OnOverwrite(node ServiceNode, desc string) {
 
 type listenerGroup struct {
 	sync.Mutex
+	node  ServiceNode
 	elems map[int]Listener
 	token int
 }
 
-func newListenerGroup() *listenerGroup {
+func newListenerGroup(node ServiceNode) *listenerGroup {
 	return &listenerGroup{
+		node:  node,
 		elems: make(map[int]Listener),
 	}
 }
@@ -76,26 +78,26 @@ func (lg *listenerGroup) remove(t int) {
 	delete(lg.elems, t)
 }
 
-func (lg *listenerGroup) notifyTimeout(node ServiceNode, lastTs time.Time) {
+func (lg *listenerGroup) notifyTimeout(lastTs time.Time) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
-		go l.OnHeartbeatTimeout(node, lastTs)
+		go l.OnHeartbeatTimeout(lg.node, lastTs)
 	}
 }
 
-func (lg *listenerGroup) notifyTermination(node ServiceNode, desc string) {
+func (lg *listenerGroup) notifyTermination(desc string) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
-		go l.OnProcessTerminate(node, desc)
+		go l.OnProcessTerminate(lg.node, desc)
 	}
 }
 
-func (lg *listenerGroup) notifyOverwrite(node ServiceNode, desc string) {
+func (lg *listenerGroup) notifyOverwrite(desc string) {
 	lg.Lock()
 	defer lg.Unlock()
 	for _, l := range lg.elems {
-		go l.OnOverwrite(node, desc)
+		go l.OnOverwrite(lg.node, desc)
 	}
 }

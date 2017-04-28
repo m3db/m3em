@@ -53,7 +53,7 @@ func newTestListener(t *testing.T) *listener {
 
 func TestHeartbeaterSimple(t *testing.T) {
 	var (
-		lg       = newListenerGroup()
+		lg       = newListenerGroup(nil)
 		opts     = newTestHeartbeatOpts()
 		iopts    = instrument.NewOptions()
 		hbServer = newHeartbeater(lg, opts, iopts)
@@ -71,7 +71,7 @@ func TestHeartbeaterSimple(t *testing.T) {
 
 func TestHeartbeatingUnknownCode(t *testing.T) {
 	var (
-		lg       = newListenerGroup()
+		lg       = newListenerGroup(nil)
 		opts     = newTestHeartbeatOpts()
 		iopts    = instrument.NewOptions()
 		hbServer = newHeartbeater(lg, opts, iopts)
@@ -90,7 +90,7 @@ func TestHeartbeatingUnknownCode(t *testing.T) {
 
 func TestHeartbeatingProcessTermination(t *testing.T) {
 	var (
-		lg    = newListenerGroup()
+		lg    = newListenerGroup(nil)
 		opts  = newTestHeartbeatOpts()
 		iopts = instrument.NewOptions()
 	)
@@ -124,7 +124,7 @@ func TestHeartbeatingProcessTermination(t *testing.T) {
 
 func TestHeartbeatingOverwrite(t *testing.T) {
 	var (
-		lg    = newListenerGroup()
+		lg    = newListenerGroup(nil)
 		opts  = newTestHeartbeatOpts()
 		iopts = instrument.NewOptions()
 	)
@@ -167,7 +167,7 @@ func TestHeartbeatingTimeout(t *testing.T) {
 			}
 			return now.Add(time.Hour)
 		}
-		lg    = newListenerGroup()
+		lg    = newListenerGroup(nil)
 		opts  = newTestHeartbeatOpts().SetNowFn(nowFn)
 		iopts = instrument.NewOptions()
 	)
@@ -201,7 +201,7 @@ func TestHeartbeatingTimeout(t *testing.T) {
 
 func TestHeartbeatRouterValidRoute(t *testing.T) {
 	var (
-		lg     = newListenerGroup()
+		lg     = newListenerGroup(nil)
 		opts   = newTestHeartbeatOpts()
 		iopts  = instrument.NewOptions()
 		router = NewHeartbeatRouter(testEndpoint)
@@ -242,7 +242,7 @@ func TestHeartbeatRouterValidRoute(t *testing.T) {
 
 func TestHeartbeatRouterDeregister(t *testing.T) {
 	var (
-		lg     = newListenerGroup()
+		lg     = newListenerGroup(nil)
 		opts   = newTestHeartbeatOpts()
 		iopts  = instrument.NewOptions()
 		router = NewHeartbeatRouter(testEndpoint)

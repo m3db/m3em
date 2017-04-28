@@ -104,7 +104,6 @@ type opHeartbeatServer struct {
 	sync.RWMutex
 	opts            HeartbeatOptions
 	iopts           instrument.Options
-	node            ServiceNode // TODO(prateek-ref): set this value
 	listeners       *listenerGroup
 	lastHeartbeat   hb.HeartbeatRequest
 	lastHeartbeatTs time.Time
@@ -125,10 +124,10 @@ func (h *opHeartbeatServer) Heartbeat(
 
 	case hb.HeartbeatCode_PROCESS_TERMINATION:
 		h.updateLastHeartbeat(nowFn(), msg)
-		h.listeners.notifyTermination(h.node, msg.GetError())
+		h.listeners.notifyTermination(msg.GetError())
 
 	case hb.HeartbeatCode_OVERWRITTEN:
-		h.listeners.notifyOverwrite(h.node, msg.GetError())
+		h.listeners.notifyOverwrite(msg.GetError())
 		h.stop()
 
 	default:
@@ -190,7 +189,7 @@ func (h *opHeartbeatServer) monitorTimeout() {
 		case <-checkTicker.C:
 			last := h.lastHeartbeatTime()
 			if !last.IsZero() && nowFn().Sub(last) > timeoutInterval && lastNotificationTs != last {
-				h.listeners.notifyTimeout(h.node, last)
+				h.listeners.notifyTimeout(last)
 				lastNotificationTs = last
 			}
 		}

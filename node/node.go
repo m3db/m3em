@@ -87,7 +87,18 @@ func New(
 	}
 
 	var (
-		listeners      = newListenerGroup()
+		retNode = &svcNode{
+			logger:   opts.InstrumentOptions().Logger(),
+			opts:     opts,
+			id:       node.ID(),
+			rack:     node.Rack(),
+			zone:     node.Zone(),
+			weight:   node.Weight(),
+			endpoint: node.Endpoint(),
+			shards:   node.Shards(),
+			status:   StatusUninitialized,
+		}
+		listeners      = newListenerGroup(retNode)
 		hbUUID         = string(uuid[:])
 		heartbeater    *opHeartbeatServer
 		routerEndpoint string
@@ -102,23 +113,12 @@ func New(
 		}
 	}
 
-	retNode := &svcNode{
-		logger:            opts.InstrumentOptions().Logger(),
-		opts:              opts,
-		id:                node.ID(),
-		rack:              node.Rack(),
-		zone:              node.Zone(),
-		weight:            node.Weight(),
-		endpoint:          node.Endpoint(),
-		shards:            node.Shards(),
-		status:            StatusUninitialized,
-		listeners:         listeners,
-		client:            client,
-		clientConn:        clientConn,
-		heartbeater:       heartbeater,
-		heartbeatEndpoint: routerEndpoint,
-		operatorUUID:      hbUUID,
-	}
+	retNode.listeners = listeners
+	retNode.client = client
+	retNode.clientConn = clientConn
+	retNode.heartbeater = heartbeater
+	retNode.heartbeatEndpoint = routerEndpoint
+	retNode.operatorUUID = hbUUID
 	return retNode, nil
 }
 
