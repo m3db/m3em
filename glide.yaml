@@ -1,7 +1,7 @@
 package: github.com/m3db/m3em
 import:
 - package: github.com/apache/thrift
-  version: master
+  version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
   repo: git://git.apache.org/thrift.git
   vcs: git
   subpackages:
