@@ -38,7 +38,6 @@ var (
 	errClusterAlreadySetup             = fmt.Errorf("cluster already setup")
 	errClusterUnableToInitialize       = fmt.Errorf("unable to initialize cluster, it needs to be setup")
 	errClusterUnableToAlterPlacement   = fmt.Errorf("unable to alter cluster placement, it needs to be initialized/running")
-	errClusterUnableToReset            = fmt.Errorf("unable to reset cluster, it needs to be setup|initialized|error")
 	errUnableToStartUnitializedCluster = fmt.Errorf("unable to start unitialized cluster")
 	errClusterUnableToTeardown         = fmt.Errorf("unable to teardown cluster, it has not been setup")
 	errUnableToStopNotRunningCluster   = fmt.Errorf("unable to stop cluster, it is running")
@@ -46,9 +45,9 @@ var (
 
 type idToNodeMap map[string]env.ServiceNode
 
-type m3dbCluster struct {
+type svcCluster struct {
 	logger       xlog.Logger
-	copts        Options
+	opts         Options
 	knownNodes   env.ServiceNodes
 	usedNodes    idToNodeMap
 	spares       []env.ServiceNode
@@ -59,7 +58,7 @@ type m3dbCluster struct {
 	lastErr    error
 }
 
-// New returns a new M3DB cluster of nodes backed by the provided environment
+// New returns a new cluster backed by provided service nodes
 func New(
 	nodes env.ServiceNodes,
 	opts Options,
@@ -68,9 +67,9 @@ func New(
 		return nil, err
 	}
 
-	return &m3dbCluster{
+	return &svcCluster{
 		logger:       opts.InstrumentOptions().Logger(),
-		copts:        opts,
+		opts:         opts,
 		knownNodes:   nodes,
 		usedNodes:    make(idToNodeMap, len(nodes)),
 		placementSvc: opts.PlacementService(),
@@ -116,7 +115,7 @@ func (e *concurrentNodeExecutor) run() {
 	e.wg.Wait()
 }
 
-func (c *m3dbCluster) Setup() error {
+func (c *svcCluster) Setup() error {
 	if c.Status() != ClusterStatusUninitialized {
 		return errClusterAlreadySetup
 	}
@@ -130,16 +129,16 @@ func (c *m3dbCluster) Setup() error {
 	}
 
 	var (
-		svcBuild        = c.copts.ServiceBuild()
-		svcConf         = c.copts.ServiceConfig()
-		sessionToken    = c.copts.SessionToken()
-		sessionOverride = c.copts.SessionOverride()
+		svcBuild        = c.opts.ServiceBuild()
+		svcConf         = c.opts.ServiceConfig()
+		sessionToken    = c.opts.SessionToken()
+		sessionOverride = c.opts.SessionOverride()
 		lock            sync.Mutex
 		multiErr        xerrors.MultiError
 	)
 
 	// setup the nodes, in parallel
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Setup(svcBuild, svcConf, sessionToken, sessionOverride); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -155,7 +154,7 @@ func (c *m3dbCluster) Setup() error {
 	return c.markStatus(ClusterStatusSetup, multiErr.FinalError())
 }
 
-func (c *m3dbCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
+func (c *svcCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
 	if c.Status() != ClusterStatusSetup {
 		return nil, errClusterUnableToInitialize
 	}
@@ -174,7 +173,7 @@ func (c *m3dbCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
 	c.spares = c.spares[numNodes:]
 
 	psvc := c.placementSvc
-	_, err := psvc.BuildInitialPlacement(nodes, c.copts.NumShards(), c.copts.Replication())
+	_, err := psvc.BuildInitialPlacement(nodes, c.opts.NumShards(), c.opts.Replication())
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +184,7 @@ func (c *m3dbCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
 	return usedNodes, nil
 }
 
-func (c *m3dbCluster) AddNode() (env.ServiceNode, error) {
+func (c *svcCluster) AddNode() (env.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -205,7 +204,7 @@ func (c *m3dbCluster) AddNode() (env.ServiceNode, error) {
 	return node, nil
 }
 
-func (c *m3dbCluster) RemoveNode(i env.ServiceNode) error {
+func (c *svcCluster) RemoveNode(i env.ServiceNode) error {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return errClusterUnableToAlterPlacement
 	}
@@ -223,7 +222,7 @@ func (c *m3dbCluster) RemoveNode(i env.ServiceNode) error {
 	return nil
 }
 
-func (c *m3dbCluster) ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error) {
+func (c *svcCluster) ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -251,11 +250,11 @@ func (c *m3dbCluster) ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, err
 	return spareNode, nil
 }
 
-func (c *m3dbCluster) Spares() []env.ServiceNode {
+func (c *svcCluster) Spares() []env.ServiceNode {
 	return c.spares
 }
 
-func (c *m3dbCluster) markStatus(status Status, err error) error {
+func (c *svcCluster) markStatus(status Status, err error) error {
 	c.statusLock.Lock()
 	defer c.statusLock.Unlock()
 
@@ -269,7 +268,7 @@ func (c *m3dbCluster) markStatus(status Status, err error) error {
 	return err
 }
 
-func (c *m3dbCluster) Teardown() error {
+func (c *svcCluster) Teardown() error {
 	if status := c.Status(); status == ClusterStatusUninitialized {
 		return errClusterUnableToTeardown
 	}
@@ -279,7 +278,7 @@ func (c *m3dbCluster) Teardown() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Teardown(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -295,7 +294,7 @@ func (c *m3dbCluster) Teardown() error {
 	return c.markStatus(ClusterStatusUninitialized, multiErr.FinalError())
 }
 
-func (c *m3dbCluster) StartInitialized() error {
+func (c *svcCluster) StartInitialized() error {
 	if status := c.Status(); status != ClusterStatusInitialized {
 		return errUnableToStartUnitializedCluster
 	}
@@ -309,7 +308,7 @@ func (c *m3dbCluster) StartInitialized() error {
 		nodes = append(nodes, node)
 	}
 
-	executor := newConcurrentNodeExecutor(nodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -325,7 +324,7 @@ func (c *m3dbCluster) StartInitialized() error {
 	return c.markStatus(ClusterStatusRunning, multiErr.FinalError())
 }
 
-func (c *m3dbCluster) Start() error {
+func (c *svcCluster) Start() error {
 	if status := c.Status(); status != ClusterStatusInitialized {
 		return errUnableToStartUnitializedCluster
 	}
@@ -335,7 +334,7 @@ func (c *m3dbCluster) Start() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -351,7 +350,7 @@ func (c *m3dbCluster) Start() error {
 	return c.markStatus(ClusterStatusRunning, multiErr.FinalError())
 }
 
-func (c *m3dbCluster) Stop() error {
+func (c *svcCluster) Stop() error {
 	if status := c.Status(); status != ClusterStatusRunning {
 		return errUnableToStopNotRunningCluster
 	}
@@ -361,7 +360,7 @@ func (c *m3dbCluster) Stop() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Stop(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -377,7 +376,7 @@ func (c *m3dbCluster) Stop() error {
 	return c.markStatus(ClusterStatusInitialized, multiErr.FinalError())
 }
 
-func (c *m3dbCluster) Status() Status {
+func (c *svcCluster) Status() Status {
 	c.statusLock.RLock()
 	defer c.statusLock.RUnlock()
 	return c.status

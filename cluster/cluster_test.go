@@ -114,7 +114,7 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
 	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
-	cluster := clusterIface.(*m3dbCluster)
+	cluster := clusterIface.(*svcCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 	cluster.status = ClusterStatusError
 
@@ -149,7 +149,7 @@ func TestClusterUninitializedStatusTransitions(t *testing.T) {
 		clusterIface, err    = New(nodes, opts)
 	)
 	require.NoError(t, err)
-	cluster := clusterIface.(*m3dbCluster)
+	cluster := clusterIface.(*svcCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
 	// illegal transitions
@@ -211,7 +211,7 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 	require.Equal(t, 2, len(insts))
 
 	// teardown (legal)
-	mCluster := cluster.(*m3dbCluster)
+	mCluster := cluster.(*svcCluster)
 	mCluster.status = ClusterStatusSetup
 	require.NoError(t, mCluster.Teardown())
 	require.Equal(t, ClusterStatusUninitialized, mCluster.Status())
@@ -231,7 +231,7 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
 	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
-	cluster := clusterIface.(*m3dbCluster)
+	cluster := clusterIface.(*svcCluster)
 	cluster.status = ClusterStatusRunning
 
 	// illegal transitions
@@ -286,7 +286,7 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
 	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
-	cluster := clusterIface.(*m3dbCluster)
+	cluster := clusterIface.(*svcCluster)
 	cluster.status = ClusterStatusInitialized
 
 	// illegal transitions

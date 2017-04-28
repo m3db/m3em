@@ -36,7 +36,7 @@ var (
 	defaultNumShards       = 1024
 )
 
-type m3dbClusterOpts struct {
+type clusterOpts struct {
 	iopts           instrument.Options
 	sessionOverride bool
 	token           string
@@ -56,7 +56,7 @@ func NewOptions(
 	if iopts == nil {
 		iopts = instrument.NewOptions()
 	}
-	return m3dbClusterOpts{
+	return clusterOpts{
 		iopts:           iopts,
 		sessionOverride: defaultSessionOverride,
 		placementSvc:    placementSvc,
@@ -66,7 +66,7 @@ func NewOptions(
 	}
 }
 
-func (o m3dbClusterOpts) Validate() error {
+func (o clusterOpts) Validate() error {
 	if o.token == "" {
 		return fmt.Errorf("no session token set")
 	}
@@ -86,83 +86,83 @@ func (o m3dbClusterOpts) Validate() error {
 	return nil
 }
 
-func (o m3dbClusterOpts) SetInstrumentOptions(iopts instrument.Options) Options {
+func (o clusterOpts) SetInstrumentOptions(iopts instrument.Options) Options {
 	o.iopts = iopts
 	return o
 }
 
-func (o m3dbClusterOpts) InstrumentOptions() instrument.Options {
+func (o clusterOpts) InstrumentOptions() instrument.Options {
 	return o.iopts
 }
 
-func (o m3dbClusterOpts) SetServiceBuild(b build.ServiceBuild) Options {
+func (o clusterOpts) SetServiceBuild(b build.ServiceBuild) Options {
 	o.svcBuild = b
 	return o
 }
 
-func (o m3dbClusterOpts) ServiceBuild() build.ServiceBuild {
+func (o clusterOpts) ServiceBuild() build.ServiceBuild {
 	return o.svcBuild
 }
 
-func (o m3dbClusterOpts) SetServiceConfig(c build.ServiceConfiguration) Options {
+func (o clusterOpts) SetServiceConfig(c build.ServiceConfiguration) Options {
 	o.svcConf = c
 	return o
 }
 
-func (o m3dbClusterOpts) ServiceConfig() build.ServiceConfiguration {
+func (o clusterOpts) ServiceConfig() build.ServiceConfiguration {
 	return o.svcConf
 }
 
-func (o m3dbClusterOpts) SetSessionToken(t string) Options {
+func (o clusterOpts) SetSessionToken(t string) Options {
 	o.token = t
 	return o
 }
 
-func (o m3dbClusterOpts) SessionToken() string {
+func (o clusterOpts) SessionToken() string {
 	return o.token
 }
 
-func (o m3dbClusterOpts) SetSessionOverride(override bool) Options {
+func (o clusterOpts) SetSessionOverride(override bool) Options {
 	o.sessionOverride = override
 	return o
 }
 
-func (o m3dbClusterOpts) SessionOverride() bool {
+func (o clusterOpts) SessionOverride() bool {
 	return o.sessionOverride
 }
 
-func (o m3dbClusterOpts) SetReplication(r int) Options {
+func (o clusterOpts) SetReplication(r int) Options {
 	o.replication = r
 	return o
 }
 
-func (o m3dbClusterOpts) Replication() int {
+func (o clusterOpts) Replication() int {
 	return o.replication
 }
 
-func (o m3dbClusterOpts) SetNumShards(ns int) Options {
+func (o clusterOpts) SetNumShards(ns int) Options {
 	o.numShards = ns
 	return o
 }
 
-func (o m3dbClusterOpts) NumShards() int {
+func (o clusterOpts) NumShards() int {
 	return o.numShards
 }
 
-func (o m3dbClusterOpts) SetPlacementService(psvc services.PlacementService) Options {
+func (o clusterOpts) SetPlacementService(psvc services.PlacementService) Options {
 	o.placementSvc = psvc
 	return o
 }
 
-func (o m3dbClusterOpts) PlacementService() services.PlacementService {
+func (o clusterOpts) PlacementService() services.PlacementService {
 	return o.placementSvc
 }
 
-func (o m3dbClusterOpts) SetNodeConcurrency(c int) Options {
+func (o clusterOpts) SetNodeConcurrency(c int) Options {
 	o.concurrency = c
 	return o
 }
 
-func (o m3dbClusterOpts) NodeConcurrency() int {
+func (o clusterOpts) NodeConcurrency() int {
 	return o.concurrency
 }

@@ -90,7 +90,7 @@ const (
 	ClusterStatusError
 )
 
-// Cluster is a collection of clustered M3DB nodes.
+// Cluster is a collection of ServiceNodes with a m3cluster Placement
 type Cluster interface {
 	// Setup the nodes in the Environment provided during construction.
 	Setup() error
@@ -129,11 +129,6 @@ type Cluster interface {
 
 	// Status returns the cluster status
 	Status() Status
-
-	// Client returns a m3db Client object
-	// Client() m3dbc.Client
-	// Client returns a m3db AdminClient object
-	// AdminClient() m3dbc.AdminClient
 }
 
 // Options represents the options to configure a `Cluster`
