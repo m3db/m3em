@@ -115,16 +115,6 @@ func (_mr *_MockClusterRecorder) Spares() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Spares")
 }
 
-func (_m *MockCluster) Reset() error {
-	ret := _m.ctrl.Call(_m, "Reset")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-func (_mr *_MockClusterRecorder) Reset() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Reset")
-}
-
 func (_m *MockCluster) Teardown() error {
 	ret := _m.ctrl.Call(_m, "Teardown")
 	ret0, _ := ret[0].(error)

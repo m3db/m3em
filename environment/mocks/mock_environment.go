@@ -26,7 +26,7 @@ package environment
 import (
 	gomock "github.com/golang/mock/gomock"
 	build "github.com/m3db/m3em/build"
-
+	environment "github.com/m3db/m3em/environment"
 	services "github.com/m3db/m3cluster/services"
 	shard "github.com/m3db/m3cluster/shard"
 	instrument "github.com/m3db/m3x/instrument"
@@ -63,7 +63,7 @@ func (_mr *_MockM3DBInstanceRecorder) Close() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Close")
 }
 
-func (_m *MockM3DBInstance) DeregisterListener(_param0 ListenerID) {
+func (_m *MockM3DBInstance) DeregisterListener(_param0 environment.ListenerID) {
 	_m.ctrl.Call(_m, "DeregisterListener", _param0)
 }
 
@@ -81,9 +81,9 @@ func (_mr *_MockM3DBInstanceRecorder) Endpoint() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Endpoint")
 }
 
-func (_m *MockM3DBInstance) Health() (M3DBInstanceHealth, error) {
+func (_m *MockM3DBInstance) Health() (environment.M3DBInstanceHealth, error) {
 	ret := _m.ctrl.Call(_m, "Health")
-	ret0, _ := ret[0].(M3DBInstanceHealth)
+	ret0, _ := ret[0].(environment.M3DBInstanceHealth)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -112,24 +112,14 @@ func (_mr *_MockM3DBInstanceRecorder) Rack() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Rack")
 }
 
-func (_m *MockM3DBInstance) RegisterListener(_param0 Listener) ListenerID {
+func (_m *MockM3DBInstance) RegisterListener(_param0 environment.Listener) environment.ListenerID {
 	ret := _m.ctrl.Call(_m, "RegisterListener", _param0)
-	ret0, _ := ret[0].(ListenerID)
+	ret0, _ := ret[0].(environment.ListenerID)
 	return ret0
 }
 
 func (_mr *_MockM3DBInstanceRecorder) RegisterListener(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "RegisterListener", arg0)
-}
-
-func (_m *MockM3DBInstance) Reset() error {
-	ret := _m.ctrl.Call(_m, "Reset")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-func (_mr *_MockM3DBInstanceRecorder) Reset() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Reset")
 }
 
 func (_m *MockM3DBInstance) SetEndpoint(_param0 string) services.PlacementInstance {
@@ -222,9 +212,9 @@ func (_mr *_MockM3DBInstanceRecorder) Start() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Start")
 }
 
-func (_m *MockM3DBInstance) Status() InstanceStatus {
+func (_m *MockM3DBInstance) Status() environment.InstanceStatus {
 	ret := _m.ctrl.Call(_m, "Status")
-	ret0, _ := ret[0].(InstanceStatus)
+	ret0, _ := ret[0].(environment.InstanceStatus)
 	return ret0
 }
 
@@ -303,9 +293,9 @@ func (_m *MockM3DBEnvironment) EXPECT() *_MockM3DBEnvironmentRecorder {
 	return _m.recorder
 }
 
-func (_m *MockM3DBEnvironment) Instances() M3DBInstances {
+func (_m *MockM3DBEnvironment) Instances() environment.M3DBInstances {
 	ret := _m.ctrl.Call(_m, "Instances")
-	ret0, _ := ret[0].(M3DBInstances)
+	ret0, _ := ret[0].(environment.M3DBInstances)
 	return ret0
 }
 
@@ -313,9 +303,9 @@ func (_mr *_MockM3DBEnvironmentRecorder) Instances() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Instances")
 }
 
-func (_m *MockM3DBEnvironment) InstancesByID() map[string]M3DBInstance {
+func (_m *MockM3DBEnvironment) InstancesByID() map[string]environment.M3DBInstance {
 	ret := _m.ctrl.Call(_m, "InstancesByID")
-	ret0, _ := ret[0].(map[string]M3DBInstance)
+	ret0, _ := ret[0].(map[string]environment.M3DBInstance)
 	return ret0
 }
 
@@ -323,9 +313,9 @@ func (_mr *_MockM3DBEnvironmentRecorder) InstancesByID() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstancesByID")
 }
 
-func (_m *MockM3DBEnvironment) Status() map[string]InstanceStatus {
+func (_m *MockM3DBEnvironment) Status() map[string]environment.InstanceStatus {
 	ret := _m.ctrl.Call(_m, "Status")
-	ret0, _ := ret[0].(map[string]InstanceStatus)
+	ret0, _ := ret[0].(map[string]environment.InstanceStatus)
 	return ret0
 }
 
@@ -364,9 +354,9 @@ func (_mr *_MockOptionsRecorder) InstrumentOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InstrumentOptions")
 }
 
-func (_m *MockOptions) NodeOptions() NodeOptions {
+func (_m *MockOptions) NodeOptions() environment.NodeOptions {
 	ret := _m.ctrl.Call(_m, "NodeOptions")
-	ret0, _ := ret[0].(NodeOptions)
+	ret0, _ := ret[0].(environment.NodeOptions)
 	return ret0
 }
 
@@ -374,9 +364,9 @@ func (_mr *_MockOptionsRecorder) NodeOptions() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NodeOptions")
 }
 
-func (_m *MockOptions) SetInstrumentOptions(_param0 instrument.Options) Options {
+func (_m *MockOptions) SetInstrumentOptions(_param0 instrument.Options) environment.Options {
 	ret := _m.ctrl.Call(_m, "SetInstrumentOptions", _param0)
-	ret0, _ := ret[0].(Options)
+	ret0, _ := ret[0].(environment.Options)
 	return ret0
 }
 
@@ -384,9 +374,9 @@ func (_mr *_MockOptionsRecorder) SetInstrumentOptions(arg0 interface{}) *gomock.
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetInstrumentOptions", arg0)
 }
 
-func (_m *MockOptions) SetNodeOptions(_param0 NodeOptions) Options {
+func (_m *MockOptions) SetNodeOptions(_param0 environment.NodeOptions) environment.Options {
 	ret := _m.ctrl.Call(_m, "SetNodeOptions", _param0)
-	ret0, _ := ret[0].(Options)
+	ret0, _ := ret[0].(environment.Options)
 	return ret0
 }
 

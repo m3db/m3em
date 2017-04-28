@@ -27,6 +27,7 @@ import (
 
 	"github.com/m3db/m3em/build"
 	env "github.com/m3db/m3em/environment"
+	mockenv "github.com/m3db/m3em/environment/mocks"
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
@@ -52,14 +53,14 @@ func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.Placeme
 }
 
 func newMockEnvironment(ctrl *gomock.Controller, instances env.M3DBInstances) env.M3DBEnvironment {
-	menv := env.NewMockM3DBEnvironment(ctrl)
+	menv := mockenv.NewMockM3DBEnvironment(ctrl)
 	menv.EXPECT().Instances().AnyTimes().Return(instances)
 	return menv
 }
 
 func newMockM3DBInstance(ctrl *gomock.Controller) env.M3DBInstance {
 	r := defaultRandomVar
-	inst := env.NewMockM3DBInstance(ctrl)
+	inst := mockenv.NewMockM3DBInstance(ctrl)
 	inst.EXPECT().ID().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
 	inst.EXPECT().Rack().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
 	inst.EXPECT().Endpoint().AnyTimes().Return(fmt.Sprintf("%v:%v", r.Int(), r.Int()))
@@ -78,7 +79,7 @@ type expectInstanceCallTypes struct {
 
 func addDefaultStatusExpects(instances []env.M3DBInstance, calls expectInstanceCallTypes) []env.M3DBInstance {
 	for _, inst := range instances {
-		mInst := inst.(*env.MockM3DBInstance)
+		mInst := inst.(*mockenv.MockM3DBInstance)
 		if calls.expectSetup {
 			mInst.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 		}
@@ -352,7 +353,7 @@ func TestClusterSetup(t *testing.T) {
 		instances            = newMockM3DBInstances(ctrl, 5)
 	)
 	for _, inst := range instances {
-		mi := inst.(*env.MockM3DBInstance)
+		mi := inst.(*mockenv.MockM3DBInstance)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
@@ -376,7 +377,7 @@ func TestClusterInitialize(t *testing.T) {
 		instances            = newMockM3DBInstances(ctrl, 5)
 	)
 	for _, inst := range instances {
-		mi := inst.(*env.MockM3DBInstance)
+		mi := inst.(*mockenv.MockM3DBInstance)
 		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	}
 	mockEnv := newMockEnvironment(ctrl, instances)
@@ -407,7 +408,7 @@ func TestClusterInitialize(t *testing.T) {
 	// test StartInitialized
 	for _, inst := range instances {
 		if spare.ID() != inst.ID() {
-			mi := inst.(*env.MockM3DBInstance)
+			mi := inst.(*mockenv.MockM3DBInstance)
 			mi.EXPECT().Start().Return(nil)
 		}
 	}

@@ -21,12 +21,11 @@
 package environment
 
 import (
+	"fmt"
 	"testing"
 
-	"fmt"
-
-	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
+	"github.com/m3db/m3cluster/services/placement"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,14 +34,17 @@ var (
 	testServiceID services.ServiceID
 )
 
-func mockM3DBInstances(
-	ctrl *gomock.Controller,
+func testM3DBInstances(
+	t *testing.T,
 	numInstances int,
 ) M3DBInstances {
+	no := newTestNodeOptions(nil)
 	var m3dbInstances M3DBInstances
 	for i := 0; i < numInstances; i++ {
-		inst := NewMockM3DBInstance(ctrl)
-		inst.EXPECT().ID().AnyTimes().Return(fmt.Sprintf("%d", i))
+		si := placement.NewInstance()
+		si.SetID(fmt.Sprintf("%d", i))
+		inst, err := NewM3DBInstance(si, no)
+		require.NoError(t, err)
 		m3dbInstances = append(m3dbInstances, inst)
 	}
 	return m3dbInstances
@@ -50,21 +52,17 @@ func mockM3DBInstances(
 
 func newTestEnv(
 	t *testing.T,
-	ctrl *gomock.Controller,
 	numInstances int,
 ) (M3DBInstances, M3DBEnvironment) {
 	opts := NewOptions(nil)
-	instances := mockM3DBInstances(ctrl, numInstances)
+	instances := testM3DBInstances(t, numInstances)
 	env, err := NewM3DBEnvironment(instances, opts)
 	require.NoError(t, err)
 	return instances, env
 }
 
 func TestNewEnvInstances(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	instances, env := newTestEnv(t, ctrl, 5)
+	instances, env := newTestEnv(t, 5)
 	envInstances := env.Instances()
 	require.Equal(t, len(instances), len(envInstances))
 	for i := range instances {
@@ -73,10 +71,7 @@ func TestNewEnvInstances(t *testing.T) {
 }
 
 func TestNewEnvInstancesByID(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	instances, env := newTestEnv(t, ctrl, 5)
+	instances, env := newTestEnv(t, 5)
 	envInstances := env.InstancesByID()
 	require.Equal(t, len(instances), len(envInstances))
 	for i := range instances {
