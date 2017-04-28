@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	defaultInstanceOptTimeout = 90 * time.Second
+	defaultNodeOptTimeout     = 90 * time.Second
 	defaultTransferBufferSize = 1024 * 1024 /* 1 MB */
 	fourMegaBytes             = 4 * 1024 * 1024
 )
@@ -53,7 +53,7 @@ func NewNodeOptions(
 	}
 	return &nodeOpts{
 		iopts:              opts,
-		operationTimeout:   defaultInstanceOptTimeout,
+		operationTimeout:   defaultNodeOptTimeout,
 		transferBufferSize: defaultTransferBufferSize,
 		retrier:            xretry.NewRetrier(xretry.NewOptions()),
 		hOpts:              NewHeartbeatOptions(),

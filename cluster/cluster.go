@@ -33,8 +33,8 @@ import (
 
 var (
 	errInsufficientCapacity            = fmt.Errorf("insufficient instance capacity in environment")
-	errInstanceAlreadyUsed             = fmt.Errorf("unable to add instance, already in use")
-	errInstanceNotInUse                = fmt.Errorf("unable to remove instance, not in use")
+	errNodeAlreadyUsed                 = fmt.Errorf("unable to add instance, already in use")
+	errNodeNotInUse                    = fmt.Errorf("unable to remove instance, not in use")
 	errClusterAlreadySetup             = fmt.Errorf("cluster already setup")
 	errClusterUnableToInitialize       = fmt.Errorf("unable to initialize cluster, it needs to be setup")
 	errClusterUnableToAlterPlacement   = fmt.Errorf("unable to alter cluster placement, it needs to be initialized/running")
@@ -44,13 +44,13 @@ var (
 	errUnableToStopNotRunningCluster   = fmt.Errorf("unable to stop cluster, it is running")
 )
 
-type idToInstanceMap map[string]env.ServiceNode
+type idToNodeMap map[string]env.ServiceNode
 
 type m3dbCluster struct {
 	logger       xlog.Logger
 	copts        Options
 	knownNodes   env.ServiceNodes
-	usedNodes    idToInstanceMap
+	usedNodes    idToNodeMap
 	spares       []env.ServiceNode
 	placementSvc services.PlacementService
 
@@ -72,7 +72,7 @@ func New(
 		logger:       opts.InstrumentOptions().Logger(),
 		copts:        opts,
 		knownNodes:   nodes,
-		usedNodes:    make(idToInstanceMap, len(nodes)),
+		usedNodes:    make(idToNodeMap, len(nodes)),
 		placementSvc: opts.PlacementService(),
 		status:       ClusterStatusUninitialized,
 	}, nil
@@ -81,30 +81,30 @@ func New(
 // TODO(prateek): reset initial placement after teardown
 // TODO(prateek): use concurrency and other options
 
-type concurrentInstanceFn func(env.ServiceNode)
+type concurrentNodeFn func(env.ServiceNode)
 
-type concurrentInstanceExecutor struct {
+type concurrentNodeExecutor struct {
 	wg      sync.WaitGroup
 	nodes   env.ServiceNodes
 	workers xsync.WorkerPool
-	fn      concurrentInstanceFn
+	fn      concurrentNodeFn
 }
 
-func newConcurrentInstanceExecutor(
+func newConcurrentNodeExecutor(
 	nodes env.ServiceNodes,
 	concurrency int,
-	fn concurrentInstanceFn,
-) *concurrentInstanceExecutor {
+	fn concurrentNodeFn,
+) *concurrentNodeExecutor {
 	workerPool := xsync.NewWorkerPool(concurrency)
 	workerPool.Init()
-	return &concurrentInstanceExecutor{
+	return &concurrentNodeExecutor{
 		nodes:   nodes,
 		workers: workerPool,
 		fn:      fn,
 	}
 }
 
-func (e *concurrentInstanceExecutor) run() {
+func (e *concurrentNodeExecutor) run() {
 	e.wg.Add(len(e.nodes))
 	for idx := range e.nodes {
 		node := e.nodes[idx]
@@ -139,7 +139,7 @@ func (c *m3dbCluster) Setup() error {
 	)
 
 	// setup the nodes, in parallel
-	executor := newConcurrentInstanceExecutor(c.knownNodes, c.copts.InstanceConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Setup(svcBuild, svcConf, sessionToken, sessionOverride); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -185,7 +185,7 @@ func (c *m3dbCluster) Initialize(numNodes int) ([]env.ServiceNode, error) {
 	return usedNodes, nil
 }
 
-func (c *m3dbCluster) AddInstance() (env.ServiceNode, error) {
+func (c *m3dbCluster) AddNode() (env.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
@@ -205,13 +205,13 @@ func (c *m3dbCluster) AddInstance() (env.ServiceNode, error) {
 	return node, nil
 }
 
-func (c *m3dbCluster) RemoveInstance(i env.ServiceNode) error {
+func (c *m3dbCluster) RemoveNode(i env.ServiceNode) error {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return errClusterUnableToAlterPlacement
 	}
 
 	if _, ok := c.usedNodes[i.ID()]; !ok {
-		return errInstanceNotInUse
+		return errNodeNotInUse
 	}
 	psvc := c.placementSvc
 	_, err := psvc.RemoveInstance(i.ID())
@@ -223,13 +223,13 @@ func (c *m3dbCluster) RemoveInstance(i env.ServiceNode) error {
 	return nil
 }
 
-func (c *m3dbCluster) ReplaceInstance(oldInstance env.ServiceNode) (env.ServiceNode, error) {
+func (c *m3dbCluster) ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error) {
 	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
 		return nil, errClusterUnableToAlterPlacement
 	}
 
-	if _, ok := c.usedNodes[oldInstance.ID()]; !ok {
-		return nil, errInstanceNotInUse
+	if _, ok := c.usedNodes[oldNode.ID()]; !ok {
+		return nil, errNodeNotInUse
 	}
 
 	numSpares := len(c.spares)
@@ -237,18 +237,18 @@ func (c *m3dbCluster) ReplaceInstance(oldInstance env.ServiceNode) (env.ServiceN
 		return nil, errInsufficientCapacity
 	}
 
-	spareInstance := c.spares[0]
+	spareNode := c.spares[0]
 	psvc := c.placementSvc
-	_, _, err := psvc.ReplaceInstance(oldInstance.ID(), []services.PlacementInstance{spareInstance})
+	_, _, err := psvc.ReplaceInstance(oldNode.ID(), []services.PlacementInstance{spareNode})
 	if err != nil {
 		return nil, err
 	}
 
-	delete(c.usedNodes, oldInstance.ID())
-	c.usedNodes[spareInstance.ID()] = spareInstance
-	c.spares = append(c.spares[1:], oldInstance)
+	delete(c.usedNodes, oldNode.ID())
+	c.usedNodes[spareNode.ID()] = spareNode
+	c.spares = append(c.spares[1:], oldNode)
 
-	return spareInstance, nil
+	return spareNode, nil
 }
 
 func (c *m3dbCluster) Spares() []env.ServiceNode {
@@ -279,7 +279,7 @@ func (c *m3dbCluster) Teardown() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentInstanceExecutor(c.knownNodes, c.copts.InstanceConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Teardown(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -309,7 +309,7 @@ func (c *m3dbCluster) StartInitialized() error {
 		nodes = append(nodes, node)
 	}
 
-	executor := newConcurrentInstanceExecutor(nodes, c.copts.InstanceConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(nodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -335,7 +335,7 @@ func (c *m3dbCluster) Start() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentInstanceExecutor(c.knownNodes, c.copts.InstanceConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
@@ -361,7 +361,7 @@ func (c *m3dbCluster) Stop() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentInstanceExecutor(c.knownNodes, c.copts.InstanceConcurrency(), func(node env.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.knownNodes, c.copts.NodeConcurrency(), func(node env.ServiceNode) {
 		if err := node.Stop(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)

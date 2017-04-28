@@ -64,14 +64,14 @@ func newMockServiceNode(ctrl *gomock.Controller) env.ServiceNode {
 	return node
 }
 
-type expectInstanceCallTypes struct {
+type expectNodeCallTypes struct {
 	expectSetup    bool
 	expectTeardown bool
 	expectStop     bool
 	expectStart    bool
 }
 
-func addDefaultStatusExpects(nodes []env.ServiceNode, calls expectInstanceCallTypes) []env.ServiceNode {
+func addDefaultStatusExpects(nodes []env.ServiceNode, calls expectNodeCallTypes) []env.ServiceNode {
 	for _, node := range nodes {
 		mNode := node.(*mockenv.MockServiceNode)
 		if calls.expectSetup {
@@ -107,7 +107,7 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl)
 	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
-	expectCalls := expectInstanceCallTypes{
+	expectCalls := expectNodeCallTypes{
 		expectSetup:    true,
 		expectTeardown: true,
 	}
@@ -125,11 +125,11 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
 	require.Error(t, cluster.Stop())
-	_, err = cluster.AddInstance()
+	_, err = cluster.AddNode()
 	require.Error(t, err)
-	err = cluster.RemoveInstance(nil)
+	err = cluster.RemoveNode(nil)
 	require.Error(t, err)
-	_, err = cluster.ReplaceInstance(nil)
+	_, err = cluster.ReplaceNode(nil)
 	require.Error(t, err)
 
 	// teardown (legal)
@@ -144,7 +144,7 @@ func TestClusterUninitializedStatusTransitions(t *testing.T) {
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		expectCalls          = expectInstanceCallTypes{expectSetup: true}
+		expectCalls          = expectNodeCallTypes{expectSetup: true}
 		nodes                = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
 		clusterIface, err    = New(nodes, opts)
 	)
@@ -156,11 +156,11 @@ func TestClusterUninitializedStatusTransitions(t *testing.T) {
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
 	require.Error(t, cluster.Stop())
-	_, err = cluster.AddInstance()
+	_, err = cluster.AddNode()
 	require.Error(t, err)
-	err = cluster.RemoveInstance(nil)
+	err = cluster.RemoveNode(nil)
 	require.Error(t, err)
-	_, err = cluster.ReplaceInstance(nil)
+	_, err = cluster.ReplaceNode(nil)
 	require.Error(t, err)
 
 	// setup (legal)
@@ -177,7 +177,7 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		expectCalls          = expectInstanceCallTypes{
+		expectCalls          = expectNodeCallTypes{
 			expectSetup:    true,
 			expectTeardown: true,
 		}
@@ -197,11 +197,11 @@ func TestClusterSetupStatusTransitions(t *testing.T) {
 	require.Error(t, cluster.Start())
 	require.Error(t, cluster.StartInitialized())
 	require.Error(t, cluster.Stop())
-	_, err = cluster.AddInstance()
+	_, err = cluster.AddNode()
 	require.Error(t, err)
-	err = cluster.RemoveInstance(nil)
+	err = cluster.RemoveNode(nil)
 	require.Error(t, err)
-	_, err = cluster.ReplaceInstance(nil)
+	_, err = cluster.ReplaceNode(nil)
 	require.Error(t, err)
 
 	// initialize (legal)
@@ -222,7 +222,7 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl).(*services.MockPlacementService)
 	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
-	expectCalls := expectInstanceCallTypes{
+	expectCalls := expectNodeCallTypes{
 		expectSetup:    true,
 		expectTeardown: true,
 		expectStop:     true,
@@ -254,21 +254,21 @@ func TestClusterRunningStatusTransitions(t *testing.T) {
 	// add (legal)
 	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusRunning
-	added, err := cluster.AddInstance()
+	added, err := cluster.AddNode()
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusRunning, cluster.Status())
 
 	// replace (legal)
 	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusRunning
-	replaced, err := cluster.ReplaceInstance(added)
+	replaced, err := cluster.ReplaceNode(added)
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusRunning, cluster.Status())
 
 	// remove (legal)
 	mockPlacementService.EXPECT().RemoveInstance(gomock.Any()).Return(nil, nil)
 	cluster.status = ClusterStatusRunning
-	err = cluster.RemoveInstance(replaced)
+	err = cluster.RemoveNode(replaced)
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusRunning, cluster.Status())
 }
@@ -278,7 +278,7 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl).(*services.MockPlacementService)
 	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
-	expectCalls := expectInstanceCallTypes{
+	expectCalls := expectNodeCallTypes{
 		expectTeardown: true,
 		expectStart:    true,
 	}
@@ -313,21 +313,21 @@ func TestClusterInitializedStatusTransitions(t *testing.T) {
 	// add (legal)
 	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusInitialized
-	added, err := cluster.AddInstance()
+	added, err := cluster.AddNode()
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusInitialized, cluster.Status())
 
 	// replace (legal)
 	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 	cluster.status = ClusterStatusInitialized
-	replaced, err := cluster.ReplaceInstance(added)
+	replaced, err := cluster.ReplaceNode(added)
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusInitialized, cluster.Status())
 
 	// remove (legal)
 	mockPlacementService.EXPECT().RemoveInstance(gomock.Any()).Return(nil, nil)
 	cluster.status = ClusterStatusInitialized
-	err = cluster.RemoveInstance(replaced)
+	err = cluster.RemoveNode(replaced)
 	require.NoError(t, err)
 	require.Equal(t, ClusterStatusInitialized, cluster.Status())
 }

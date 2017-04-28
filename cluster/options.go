@@ -158,11 +158,11 @@ func (o m3dbClusterOpts) PlacementService() services.PlacementService {
 	return o.placementSvc
 }
 
-func (o m3dbClusterOpts) SetInstanceConcurrency(c int) Options {
+func (o m3dbClusterOpts) SetNodeConcurrency(c int) Options {
 	o.concurrency = c
 	return o
 }
 
-func (o m3dbClusterOpts) InstanceConcurrency() int {
+func (o m3dbClusterOpts) NodeConcurrency() int {
 	return o.concurrency
 }

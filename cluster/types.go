@@ -62,10 +62,10 @@ import (
 //         ┌──║     Running      ║◀────────────────────║   Initialized    ║──┐
 //         │  ║                  ║                     ║                  ║  │
 //         │  ╚══════════════════╩───────Stop()───────▶╚══════════════════╝  │
-// AddInstance()        ▲                                        ▲           │
-// RemoveInstance()     │                                        │     AddInstance()
-// ReplaceInstance()────┘                                        └─────RemoveInstance()
-//                                                                     ReplaceInstance()
+// AddNode()        ▲                                        ▲           │
+// RemoveNode()     │                                        │     AddNode()
+// ReplaceNode()────┘                                        └─────RemoveNode()
+//                                                                     ReplaceNode()
 type Status int
 
 const (
@@ -98,17 +98,17 @@ type Cluster interface {
 	// Initialize initializes service placement for the specified numNodes.
 	Initialize(numNodes int) ([]env.ServiceNode, error)
 
-	// AddInstance adds the specified instance to the service placement. It does
-	// NOT alter the state of the ServiceInstance (i.e. does not start/stop it).
-	AddInstance() (env.ServiceNode, error)
+	// AddNode adds the specified instance to the service placement. It does
+	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
+	AddNode() (env.ServiceNode, error)
 
-	// RemoveInstance removes the specified instance from the service placement. It does
-	// NOT alter the state of the ServiceInstance (i.e. does not start/stop it).
-	RemoveInstance(env.ServiceNode) error
+	// RemoveNode removes the specified instance from the service placement. It does
+	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
+	RemoveNode(env.ServiceNode) error
 
-	// ReplaceInstance replaces the specified instance with a new instance in the service
-	// placement. It does NOT alter the state of the TestInstance (i.e. does not start/stop it).
-	ReplaceInstance(oldInstance env.ServiceNode) (env.ServiceNode, error)
+	// ReplaceNode replaces the specified instance with a new instance in the service
+	// placement. It does NOT alter the state of the TestNode (i.e. does not start/stop it).
+	ReplaceNode(oldNode env.ServiceNode) (env.ServiceNode, error)
 
 	// Spares returns the nodes available in the environment which are not part of the
 	// cluster (i.e. placement).
@@ -195,11 +195,11 @@ type Options interface {
 	// configuration
 	PlacementService() services.PlacementService
 
-	// SetInstanceConcurrency sets the number of nodes to operate upon
+	// SetNodeConcurrency sets the number of nodes to operate upon
 	// concurrently
-	SetInstanceConcurrency(int) Options
+	SetNodeConcurrency(int) Options
 
-	// InstanceConcurrency returns the number of nodes to operate upon
+	// NodeConcurrency returns the number of nodes to operate upon
 	// concurrently
-	InstanceConcurrency() int
+	NodeConcurrency() int
 }
