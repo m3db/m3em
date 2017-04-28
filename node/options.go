@@ -21,43 +21,108 @@
 package node
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/m3db/m3x/instrument"
+	xretry "github.com/m3db/m3x/retry"
 )
 
-type opts struct {
-	iopts    instrument.Options
-	nodeOpts NodeOptions
+var (
+	defaultNodeOptTimeout     = 90 * time.Second
+	defaultTransferBufferSize = 1024 * 1024 /* 1 MB */
+	fourMegaBytes             = 4 * 1024 * 1024
+)
+
+type nodeOpts struct {
+	iopts              instrument.Options
+	connectionTimeout  time.Duration
+	operationTimeout   time.Duration
+	transferBufferSize int
+	retrier            xretry.Retrier
+	hOpts              HeartbeatOptions
+	opClientFn         OperatorClientFn
 }
 
-// NewOptions returns a new Options object
-func NewOptions(iopts instrument.Options) Options {
-	if iopts == nil {
-		iopts = instrument.NewOptions()
+// NewOptions returns a new NodeOptions construct.
+func NewOptions(
+	opts instrument.Options,
+) NodeOptions {
+	if opts == nil {
+		opts = instrument.NewOptions()
 	}
-	return &opts{
-		iopts:    iopts,
-		nodeOpts: NewNodeOptions(iopts),
+	return &nodeOpts{
+		iopts:              opts,
+		operationTimeout:   defaultNodeOptTimeout,
+		transferBufferSize: defaultTransferBufferSize,
+		retrier:            xretry.NewRetrier(xretry.NewOptions()),
+		hOpts:              NewHeartbeatOptions(),
 	}
 }
 
-func (o opts) Validate() error {
-	return o.nodeOpts.Validate()
+func (o *nodeOpts) Validate() error {
+	// grpc max message size (by default, 4MB). see also: https://github.com/grpc/grpc-go/issues/746
+	if o.transferBufferSize >= fourMegaBytes {
+		return fmt.Errorf("TransferBufferSize must be < 4MB")
+	}
+
+	if o.opClientFn == nil {
+		return fmt.Errorf("OperatorClientFn is not set")
+	}
+
+	return o.hOpts.Validate()
 }
 
-func (o opts) SetInstrumentOptions(iopts instrument.Options) Options {
-	o.iopts = iopts
+func (o *nodeOpts) SetInstrumentOptions(io instrument.Options) NodeOptions {
+	o.iopts = io
 	return o
 }
 
-func (o opts) InstrumentOptions() instrument.Options {
+func (o *nodeOpts) InstrumentOptions() instrument.Options {
 	return o.iopts
 }
 
-func (o opts) SetNodeOptions(no NodeOptions) Options {
-	o.nodeOpts = no
+func (o *nodeOpts) SetRetrier(retrier xretry.Retrier) NodeOptions {
+	o.retrier = retrier
 	return o
 }
 
-func (o opts) NodeOptions() NodeOptions {
-	return o.nodeOpts
+func (o *nodeOpts) Retrier() xretry.Retrier {
+	return o.retrier
+}
+
+func (o *nodeOpts) SetOperationTimeout(d time.Duration) NodeOptions {
+	o.operationTimeout = d
+	return o
+}
+
+func (o *nodeOpts) OperationTimeout() time.Duration {
+	return o.operationTimeout
+}
+
+func (o *nodeOpts) SetTransferBufferSize(sz int) NodeOptions {
+	o.transferBufferSize = sz
+	return o
+}
+
+func (o *nodeOpts) TransferBufferSize() int {
+	return o.transferBufferSize
+}
+
+func (o *nodeOpts) SetHeartbeatOptions(ho HeartbeatOptions) NodeOptions {
+	o.hOpts = ho
+	return o
+}
+
+func (o *nodeOpts) HeartbeatOptions() HeartbeatOptions {
+	return o.hOpts
+}
+
+func (o *nodeOpts) SetOperatorClientFn(fn OperatorClientFn) NodeOptions {
+	o.opClientFn = fn
+	return o
+}
+
+func (o *nodeOpts) OperatorClientFn() OperatorClientFn {
+	return o.opClientFn
 }

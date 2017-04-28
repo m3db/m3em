@@ -64,10 +64,10 @@ func TestLargeFileTransfer(t *testing.T) {
 	defer server.GracefulStop()
 
 	// create operator to communicate with agent
-	nodeOpts := node.NewNodeOptions(iopts).
+	nodeOpts := node.NewOptions(iopts).
 		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := node.NewServiceNode(svc, nodeOpts)
+	node, err := node.New(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 

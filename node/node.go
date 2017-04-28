@@ -74,8 +74,8 @@ type svcNode struct {
 	m3dbClient m3dbrpc.TChanNode
 }
 
-// NewServiceNode returns a new ServiceNode.
-func NewServiceNode(
+// New returns a new ServiceNode.
+func New(
 	node services.PlacementInstance,
 	opts NodeOptions,
 ) (ServiceNode, error) {

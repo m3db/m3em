@@ -88,11 +88,11 @@ func TestHeartbeatTimeout(t *testing.T) {
 		SetTimeout(2 * time.Second).
 		SetCheckInterval(100 * time.Millisecond).
 		SetInterval(200 * time.Millisecond)
-	nodeOpts := node.NewNodeOptions(iopts).
+	nodeOpts := node.NewOptions(iopts).
 		SetHeartbeatOptions(hbOpts).
 		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := node.NewServiceNode(svc, nodeOpts)
+	node, err := node.New(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 

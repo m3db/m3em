@@ -86,11 +86,11 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	hbOpts := node.NewHeartbeatOptions().
 		SetEnabled(true).
 		SetHeartbeatRouter(hbRouter)
-	nodeOpts := node.NewNodeOptions(iopts).
+	nodeOpts := node.NewOptions(iopts).
 		SetHeartbeatOptions(hbOpts).
 		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := node.NewServiceNode(svc, nodeOpts)
+	node, err := node.New(svc, nodeOpts)
 	require.NoError(t, err)
 	defer node.Close()
 	// capture notifications from operator
