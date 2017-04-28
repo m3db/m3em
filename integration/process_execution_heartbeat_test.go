@@ -90,9 +90,9 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 		SetHeartbeatOptions(hbOpts).
 		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
 	svc := placement.NewInstance()
-	node, err := node.New(svc, nodeOpts)
+	svcNode, err := node.New(svc, nodeOpts)
 	require.NoError(t, err)
-	defer node.Close()
+	defer svcNode.Close()
 	// capture notifications from operator
 	var (
 		lock                sync.Mutex
@@ -112,8 +112,8 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 			require.FailNow(t, "received overwrite: %v", s)
 		},
 	)
-	id := node.RegisterListener(eventListener)
-	defer node.DeregisterListener(id)
+	id := svcNode.RegisterListener(eventListener)
+	defer svcNode.DeregisterListener(id)
 
 	// create test build
 	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
@@ -126,11 +126,11 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
 	// get the files transferred over
-	err = node.Setup(testBinary, testConfig, "tok", false)
+	err = svcNode.Setup(testBinary, testConfig, "tok", false)
 	require.NoError(t, err)
 
 	// execute the build
-	require.NoError(t, node.Start())
+	require.NoError(t, svcNode.Start())
 	stopped := waitUntilAgentFinished(agentService, time.Second)
 	require.True(t, stopped)
 
