@@ -1,5 +1,5 @@
 # Build Output
-out/
+bin/
 test.log
 
 # Glide dependencies
