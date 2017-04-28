@@ -1,12 +1,12 @@
-hash: aed93333b2fddd708fcc1eb4e48738b6c04b3acc1ae683e0a6f0dae4f078e127
-updated: 2017-04-12T13:28:39.650872077-04:00
+hash: fa4a61e16b0de60cce29addb7f78179db6026a5a02693bb35f38e0eb874618ee
+updated: 2017-04-28T15:54:26.142621645-04:00
 imports:
 - name: github.com/apache/thrift
   version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
   subpackages:
   - lib/go/thrift
 - name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
   - spew
 - name: github.com/facebookgo/clock
@@ -36,44 +36,18 @@ imports:
 - name: github.com/m3db/m3cluster
   version: 5e66868870e23c1182c7788714d9f46f61449c54
   subpackages:
-  - client
-  - kv
   - services
   - services/placement
   - shard
-- name: github.com/m3db/m3db
-  version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
-  subpackages:
-  - client
-  - clock
-  - context
-  - digest
-  - encoding
-  - encoding/m3tsz
-  - generated/thrift/rpc
-  - network/server/tchannelthrift/convert
-  - network/server/tchannelthrift/errors
-  - network/server/tchannelthrift/node/channel
-  - retention
-  - sharding
-  - storage/block
-  - storage/bootstrap/result
-  - topology
-  - ts
-  - x/io
 - name: github.com/m3db/m3x
   version: 3a8328d65b7880b034b8515177921023b41e4399
   subpackages:
-  - checked
-  - clock
   - close
   - errors
   - instrument
   - log
-  - pool
   - retry
   - sync
-  - time
   - watch
 - name: github.com/magiconair/properties
   version: b3b15ef068fd0b17ddf408a23669f20811d194d2
@@ -81,10 +55,6 @@ imports:
   version: 53818660ed4955e899c0bcafa97299a388bd7c8e
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
-- name: github.com/opentracing/opentracing-go
-  version: 855519783f479520497c6b3445611b05fc42f009
-  subpackages:
-  - ext
 - name: github.com/pborman/getopt
   version: ec82d864f599c39673eef89f91b93fa5576567a1
 - name: github.com/pelletier/go-buffruneio
@@ -92,11 +62,9 @@ imports:
 - name: github.com/pelletier/go-toml
   version: 3b00596b2e9ee541bbd72dc50cc0c60e2b46c69c
 - name: github.com/pmezard/go-difflib
-  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
-- name: github.com/spaolacci/murmur3
-  version: 0d12bf811670bf6a1a63828dfbd003eded177fce
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -123,15 +91,6 @@ imports:
   - m3/customtransports
   - m3/thrift
   - m3/thriftudp
-- name: github.com/uber/tchannel-go
-  version: 8d570ed87acb2661d390c096215260f3f9e9b931
-  subpackages:
-  - relay
-  - thrift
-  - thrift/gen-go/meta
-  - tnet
-  - trand
-  - typed
 - name: golang.org/x/net
   version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:

@@ -14,12 +14,6 @@ import:
   subpackages:
   - services
   - shard
-- package: github.com/m3db/m3db
-  version: 4d41e2d211f35888c76894ab77fb3ffddee7e273
-  subpackages:
-  - client
-  - generated/thrift/rpc
-  - network/server/tchannelthrift/node/channel
 - package: github.com/m3db/m3x
   version: 3a8328d65b7880b034b8515177921023b41e4399
   subpackages:
@@ -39,10 +33,6 @@ import:
   version: v1.1.0
   subpackages:
   - m3
-- package: github.com/uber/tchannel-go
-  version: 8d570ed87acb2661d390c096215260f3f9e9b931
-  subpackages:
-  - thrift
 - package: golang.org/x/net
   version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:
