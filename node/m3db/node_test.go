@@ -23,8 +23,6 @@ package m3db
 import (
 	"testing"
 
-	"google.golang.org/grpc"
-
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/node"
 	mocknode "github.com/m3db/m3em/node/mocks"
@@ -32,6 +30,7 @@ import (
 	"github.com/golang/mock/gomock"
 	m3dbrpc "github.com/m3db/m3db/generated/thrift/rpc"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 )
 
 func newTestOptions() Options {
