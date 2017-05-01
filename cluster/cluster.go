@@ -33,30 +33,40 @@ import (
 )
 
 var (
-	errInsufficientCapacity            = fmt.Errorf("insufficient node capacity in environment")
-	errNodeAlreadyUsed                 = fmt.Errorf("unable to add node, already in use")
-	errNodeNotInUse                    = fmt.Errorf("unable to remove node, not in use")
-	errClusterAlreadySetup             = fmt.Errorf("cluster already setup")
-	errClusterUnableToInitialize       = fmt.Errorf("unable to initialize cluster, it needs to be setup")
-	errClusterUnableToAlterPlacement   = fmt.Errorf("unable to alter cluster placement, it needs to be initialized/running")
-	errUnableToStartUnitializedCluster = fmt.Errorf("unable to start unitialized cluster")
-	errClusterUnableToTeardown         = fmt.Errorf("unable to teardown cluster, it has not been setup")
-	errUnableToStopNotRunningCluster   = fmt.Errorf("unable to stop cluster, it is running")
+	errInsufficientCapacity          = fmt.Errorf("insufficient node capacity in environment")
+	errNodeAlreadyUsed               = fmt.Errorf("unable to add node, already in use")
+	errNodeNotInUse                  = fmt.Errorf("unable to remove node, not in use")
+	errClusterNotUnitialized         = fmt.Errorf("unable to setup cluster, it is not unitialized")
+	errClusterUnableToInitialize     = fmt.Errorf("unable to initialize cluster, it needs to be setup")
+	errClusterUnableToAlterPlacement = fmt.Errorf("unable to alter cluster placement, it needs to be setup/running")
+	errUnableToStartUnsetupCluster   = fmt.Errorf("unable to start cluster, it has not been setup")
+	errClusterUnableToTeardown       = fmt.Errorf("unable to teardown cluster, it has not been setup")
+	errUnableToStopNotRunningCluster = fmt.Errorf("unable to stop cluster, it is running")
 )
 
 type idToNodeMap map[string]node.ServiceNode
 
+func (im idToNodeMap) values() []node.ServiceNode {
+	returnNodes := make([]node.ServiceNode, 0, len(im))
+	for _, node := range im {
+		returnNodes = append(returnNodes, node)
+	}
+	return returnNodes
+}
+
 type svcCluster struct {
+	sync.RWMutex
+
 	logger       xlog.Logger
 	opts         Options
 	knownNodes   node.ServiceNodes
 	usedNodes    idToNodeMap
 	spares       []node.ServiceNode
+	sparesByID   map[string]node.ServiceNode
 	placementSvc services.PlacementService
-
-	statusLock sync.RWMutex
-	status     Status
-	lastErr    error
+	placement    services.ServicePlacement
+	status       Status
+	lastErr      error
 }
 
 // New returns a new cluster backed by provided service nodes
@@ -68,14 +78,59 @@ func New(
 		return nil, err
 	}
 
-	return &svcCluster{
+	cluster := &svcCluster{
 		logger:       opts.InstrumentOptions().Logger(),
 		opts:         opts,
 		knownNodes:   nodes,
 		usedNodes:    make(idToNodeMap, len(nodes)),
+		spares:       make([]node.ServiceNode, 0, len(nodes)),
+		sparesByID:   make(map[string]node.ServiceNode, len(nodes)),
 		placementSvc: opts.PlacementService(),
 		status:       ClusterStatusUninitialized,
-	}, nil
+	}
+	cluster.addSparesWithLock(nodes)
+
+	return cluster, nil
+}
+
+func (c *svcCluster) addSparesWithLock(spares []node.ServiceNode) {
+	for _, spare := range spares {
+		c.spares = append(c.spares, spare)
+		c.sparesByID[spare.ID()] = spare
+	}
+}
+
+func (c *svcCluster) removeFromSparesWithLock(nodes []node.ServiceNode) error {
+	var multiErr xerrors.MultiError
+
+	// ensure all provided nodes are actually spares
+	for _, n := range nodes {
+		if _, ok := c.sparesByID[n.ID()]; !ok {
+			multiErr = multiErr.Add(fmt.Errorf("unable to remove node: %+v from spares", n))
+		}
+	}
+	if err := multiErr.FinalError(); err != nil {
+		return err
+	}
+
+	ids := make(map[string]struct{}, len(nodes))
+	for _, n := range nodes {
+		delete(c.sparesByID, n.ID())
+		ids[n.ID()] = struct{}{}
+	}
+
+	c.spares = nodeSliceWithoutSpecifiedIDs(c.spares, ids)
+	return nil
+}
+
+func nodeSliceWithoutSpecifiedIDs(originalSlice node.ServiceNodes, removeIDs map[string]struct{}) node.ServiceNodes {
+	newSlice := make(node.ServiceNodes, 0, len(originalSlice))
+	for _, elem := range originalSlice {
+		if _, ok := removeIDs[elem.ID()]; !ok {
+			newSlice = append(newSlice, elem)
+		}
+	}
+	return newSlice
 }
 
 // TODO(prateek): reset initial placement after teardown
@@ -116,17 +171,24 @@ func (e *concurrentNodeExecutor) run() {
 	e.wg.Wait()
 }
 
-func (c *svcCluster) Setup() error {
-	if c.Status() != ClusterStatusUninitialized {
-		return errClusterAlreadySetup
-	}
+func (c *svcCluster) Placement() services.ServicePlacement {
+	c.Lock()
+	defer c.Unlock()
+	return c.placement
+}
 
+func (c *svcCluster) initWithLock() error {
 	psvc := c.placementSvc
-	if _, _, err := psvc.Placement(); err != nil { // attempt to retrieve current placement
-		c.logger.Infof("unable to retrieve current placement, skipping delete attempt")
-	} else if err = psvc.Delete(); err != nil { // delete existing placement
-		// only logging error instead of letting it flow through as the placement should
-		c.logger.Infof("placement deletion during cluster Setup failed: %v", err)
+	_, _, err := psvc.Placement()
+	if err != nil { // attempt to retrieve current placement
+		c.logger.Infof("unable to retrieve existing placement, skipping delete attempt")
+	} else {
+		// delete existing placement
+		err = psvc.Delete()
+		if err != nil {
+			return fmt.Errorf("unable to delete existing placement during setup(): %+v", err)
+		}
+		c.logger.Infof("successfully deleted existing placement")
 	}
 
 	var (
@@ -138,26 +200,31 @@ func (c *svcCluster) Setup() error {
 		multiErr        xerrors.MultiError
 	)
 
-	// setup the nodes, in parallel
+	// setup all known service nodes with build, config
 	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
-		if err := node.Setup(svcBuild, svcConf, sessionToken, sessionOverride); err != nil {
+		err := node.Setup(svcBuild, svcConf, sessionToken, sessionOverride)
+		if err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
 			lock.Unlock()
 			return
 		}
-		lock.Lock()
-		c.spares = append(c.spares, node)
-		lock.Unlock()
 	})
 	executor.run()
 
-	return c.markStatus(ClusterStatusSetup, multiErr.FinalError())
+	return multiErr.FinalError()
 }
 
-func (c *svcCluster) Initialize(numNodes int) ([]node.ServiceNode, error) {
-	if c.Status() != ClusterStatusSetup {
-		return nil, errClusterUnableToInitialize
+func (c *svcCluster) Setup(numNodes int) ([]node.ServiceNode, error) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status != ClusterStatusUninitialized {
+		return nil, errClusterNotUnitialized
+	}
+
+	if err := c.initWithLock(); err != nil {
+		return nil, err
 	}
 
 	numSpares := len(c.spares)
@@ -165,28 +232,50 @@ func (c *svcCluster) Initialize(numNodes int) ([]node.ServiceNode, error) {
 		return nil, errInsufficientCapacity
 	}
 
-	usedNodes := c.spares[:numNodes]
-	nodes := make([]services.PlacementInstance, 0, numNodes)
-	for _, node := range usedNodes {
-		c.usedNodes[node.ID()] = node
-		nodes = append(nodes, node)
-	}
-	c.spares = c.spares[numNodes:]
-
 	psvc := c.placementSvc
-	_, err := psvc.BuildInitialPlacement(nodes, c.opts.NumShards(), c.opts.Replication())
+	placement, err := psvc.BuildInitialPlacement(c.sparesAsPlacementInstaceWithLock(), c.opts.NumShards(), c.opts.Replication())
 	if err != nil {
 		return nil, err
 	}
 
-	c.statusLock.Lock()
-	c.status = ClusterStatusInitialized
-	c.statusLock.Unlock()
-	return usedNodes, nil
+	// update ServiceNode with new shards from placement
+	var (
+		multiErr      xerrors.MultiError
+		usedInstances = placement.Instances()
+		setupNodes    = make([]node.ServiceNode, 0, len(usedInstances))
+	)
+	for _, instance := range usedInstances {
+		setupNode, err := c.markSpareUsedWithLock(instance)
+		if err != nil {
+			multiErr = multiErr.Add(err)
+			continue
+		}
+		setupNodes = append(setupNodes, setupNode)
+	}
+
+	multiErr = multiErr.
+		Add(c.removeFromSparesWithLock(setupNodes)).
+		Add(c.setPlacementWithLock(placement))
+
+	return setupNodes, c.markStatusWithLock(ClusterStatusSetup, multiErr.FinalError())
+}
+
+func (c *svcCluster) markSpareUsedWithLock(spare services.PlacementInstance) (node.ServiceNode, error) {
+	id := spare.ID()
+	spareNode, ok := c.sparesByID[id]
+	if !ok {
+		// should never happen
+		return nil, fmt.Errorf("unable to find spare node with id: %s", id)
+	}
+	c.usedNodes[id] = spareNode
+	return spareNode, nil
 }
 
 func (c *svcCluster) AddNode() (node.ServiceNode, error) {
-	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status != ClusterStatusRunning && c.status != ClusterStatusSetup {
 		return nil, errClusterUnableToAlterPlacement
 	}
 
@@ -194,37 +283,80 @@ func (c *svcCluster) AddNode() (node.ServiceNode, error) {
 	if numSpares < 1 {
 		return nil, errInsufficientCapacity
 	}
-	node := c.spares[0]
+
 	psvc := c.placementSvc
-	_, _, err := psvc.AddInstance([]services.PlacementInstance{node})
+	newPlacement, usedInstance, err := psvc.AddInstance(c.sparesAsPlacementInstaceWithLock())
 	if err != nil {
 		return nil, err
 	}
-	c.usedNodes[node.ID()] = node
-	c.spares = c.spares[1:]
-	return node, nil
+
+	setupNode, err := c.markSpareUsedWithLock(usedInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := c.removeFromSparesWithLock([]node.ServiceNode{setupNode}); err != nil {
+		return nil, err
+	}
+
+	c.setPlacementWithLock(newPlacement)
+	return setupNode, nil
 }
 
-func (c *svcCluster) RemoveNode(i node.ServiceNode) error {
-	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
-		return errClusterUnableToAlterPlacement
+func (c *svcCluster) setPlacementWithLock(p services.ServicePlacement) error {
+	for _, instance := range p.Instances() {
+		instanceID := instance.ID()
+		usedNode, ok := c.usedNodes[instanceID]
+		if !ok {
+			return fmt.Errorf("unable to set placement, instance %+v is not marked as used", instance)
+		}
+		usedNode.SetShards(instance.Shards())
 	}
 
-	if _, ok := c.usedNodes[i.ID()]; !ok {
-		return errNodeNotInUse
-	}
-	psvc := c.placementSvc
-	_, err := psvc.RemoveInstance(i.ID())
-	if err != nil {
-		return err
-	}
-	delete(c.usedNodes, i.ID())
-	c.spares = append(c.spares, i)
+	c.placement = p
 	return nil
 }
 
-func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) (node.ServiceNode, error) {
-	if status := c.Status(); status != ClusterStatusRunning && status != ClusterStatusInitialized {
+func (c *svcCluster) sparesAsPlacementInstaceWithLock() []services.PlacementInstance {
+	spares := make([]services.PlacementInstance, 0, len(c.spares))
+	for _, spare := range c.spares {
+		spares = append(spares, spare.(services.PlacementInstance))
+	}
+	return spares
+}
+
+func (c *svcCluster) RemoveNode(i node.ServiceNode) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status != ClusterStatusRunning && c.status != ClusterStatusSetup {
+		return errClusterUnableToAlterPlacement
+	}
+
+	usedNode, ok := c.usedNodes[i.ID()]
+	if !ok {
+		return errNodeNotInUse
+	}
+
+	psvc := c.placementSvc
+	newPlacement, err := psvc.RemoveInstance(i.ID())
+	if err != nil {
+		return err
+	}
+
+	// update removed instance from used -> spare
+	usedNode.SetShards(nil)
+	delete(c.usedNodes, usedNode.ID())
+	c.addSparesWithLock([]node.ServiceNode{usedNode})
+
+	return c.setPlacementWithLock(newPlacement)
+}
+
+func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) ([]node.ServiceNode, error) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status != ClusterStatusRunning && c.status != ClusterStatusSetup {
 		return nil, errClusterUnableToAlterPlacement
 	}
 
@@ -232,33 +364,56 @@ func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) (node.ServiceNode, er
 		return nil, errNodeNotInUse
 	}
 
-	numSpares := len(c.spares)
-	if numSpares < 1 {
-		return nil, errInsufficientCapacity
-	}
-
-	spareNode := c.spares[0]
 	psvc := c.placementSvc
-	_, _, err := psvc.ReplaceInstance(oldNode.ID(), []services.PlacementInstance{spareNode})
+	newPlacement, newInstances, err := psvc.ReplaceInstance(oldNode.ID(), c.sparesAsPlacementInstaceWithLock())
 	if err != nil {
 		return nil, err
 	}
 
+	// mark old node no longer used
+	oldNode.SetShards(nil)
 	delete(c.usedNodes, oldNode.ID())
-	c.usedNodes[spareNode.ID()] = spareNode
-	c.spares = append(c.spares[1:], oldNode)
+	c.addSparesWithLock([]node.ServiceNode{oldNode})
 
-	return spareNode, nil
+	var (
+		multiErr xerrors.MultiError
+		newNodes = make([]node.ServiceNode, 0, len(newInstances))
+	)
+	for _, instance := range newInstances {
+		newNode, err := c.markSpareUsedWithLock(instance)
+		if err != nil {
+			multiErr = multiErr.Add(err)
+			continue
+		}
+		newNodes = append(newNodes, newNode)
+	}
+
+	multiErr = multiErr.
+		Add(c.removeFromSparesWithLock(newNodes)).
+		Add(c.setPlacementWithLock(newPlacement))
+
+	return newNodes, nil
 }
 
-func (c *svcCluster) Spares() []node.ServiceNode {
+func (c *svcCluster) SpareNodes() []node.ServiceNode {
+	c.Lock()
+	defer c.Unlock()
 	return c.spares
 }
 
-func (c *svcCluster) markStatus(status Status, err error) error {
-	c.statusLock.Lock()
-	defer c.statusLock.Unlock()
+func (c *svcCluster) ActiveNodes() []node.ServiceNode {
+	c.Lock()
+	defer c.Unlock()
+	return c.usedNodes.values()
+}
 
+func (c *svcCluster) KnownNodes() []node.ServiceNode {
+	c.Lock()
+	defer c.Unlock()
+	return c.knownNodes
+}
+
+func (c *svcCluster) markStatusWithLock(status Status, err error) error {
 	if err == nil {
 		c.status = status
 		return nil
@@ -270,7 +425,10 @@ func (c *svcCluster) markStatus(status Status, err error) error {
 }
 
 func (c *svcCluster) Teardown() error {
-	if status := c.Status(); status == ClusterStatusUninitialized {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status == ClusterStatusUninitialized {
 		return errClusterUnableToTeardown
 	}
 
@@ -286,48 +444,26 @@ func (c *svcCluster) Teardown() error {
 			lock.Unlock()
 			return
 		}
-		lock.Lock()
-		c.spares = append(c.spares, node)
-		lock.Unlock()
 	})
 	executor.run()
 
-	return c.markStatus(ClusterStatusUninitialized, multiErr.FinalError())
-}
-
-func (c *svcCluster) StartInitialized() error {
-	if status := c.Status(); status != ClusterStatusInitialized {
-		return errUnableToStartUnitializedCluster
+	for id, usedNode := range c.usedNodes {
+		usedNode.SetShards(nil)
+		delete(c.usedNodes, id)
 	}
+	c.spares = make([]node.ServiceNode, 0, len(c.knownNodes))
+	c.sparesByID = make(map[string]node.ServiceNode, len(c.knownNodes))
+	c.addSparesWithLock(c.knownNodes)
 
-	var (
-		lock     sync.Mutex
-		multiErr xerrors.MultiError
-		nodes    = make(node.ServiceNodes, 0, len(c.usedNodes))
-	)
-	for _, node := range c.usedNodes {
-		nodes = append(nodes, node)
-	}
-
-	executor := newConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
-		if err := node.Start(); err != nil {
-			lock.Lock()
-			multiErr = multiErr.Add(err)
-			lock.Unlock()
-			return
-		}
-		lock.Lock()
-		c.spares = append(c.spares, node)
-		lock.Unlock()
-	})
-	executor.run()
-
-	return c.markStatus(ClusterStatusRunning, multiErr.FinalError())
+	return c.markStatusWithLock(ClusterStatusUninitialized, multiErr.FinalError())
 }
 
 func (c *svcCluster) Start() error {
-	if status := c.Status(); status != ClusterStatusInitialized {
-		return errUnableToStartUnitializedCluster
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status != ClusterStatusSetup {
+		return errUnableToStartUnsetupCluster
 	}
 
 	var (
@@ -335,24 +471,24 @@ func (c *svcCluster) Start() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.usedNodes.values(), c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Start(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
 			lock.Unlock()
 			return
 		}
-		lock.Lock()
-		c.spares = append(c.spares, node)
-		lock.Unlock()
 	})
 	executor.run()
 
-	return c.markStatus(ClusterStatusRunning, multiErr.FinalError())
+	return c.markStatusWithLock(ClusterStatusRunning, multiErr.FinalError())
 }
 
 func (c *svcCluster) Stop() error {
-	if status := c.Status(); status != ClusterStatusRunning {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.status != ClusterStatusRunning {
 		return errUnableToStopNotRunningCluster
 	}
 
@@ -361,24 +497,21 @@ func (c *svcCluster) Stop() error {
 		multiErr xerrors.MultiError
 	)
 
-	executor := newConcurrentNodeExecutor(c.knownNodes, c.opts.NodeConcurrency(), func(node node.ServiceNode) {
+	executor := newConcurrentNodeExecutor(c.usedNodes.values(), c.opts.NodeConcurrency(), func(node node.ServiceNode) {
 		if err := node.Stop(); err != nil {
 			lock.Lock()
 			multiErr = multiErr.Add(err)
 			lock.Unlock()
 			return
 		}
-		lock.Lock()
-		c.spares = append(c.spares, node)
-		lock.Unlock()
 	})
 	executor.run()
 
-	return c.markStatus(ClusterStatusInitialized, multiErr.FinalError())
+	return c.markStatusWithLock(ClusterStatusSetup, multiErr.FinalError())
 }
 
 func (c *svcCluster) Status() Status {
-	c.statusLock.RLock()
-	defer c.statusLock.RUnlock()
+	c.RLock()
+	defer c.RUnlock()
 	return c.status
 }

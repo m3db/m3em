@@ -196,8 +196,6 @@ type Options interface {
 }
 
 // OperatorClientFn returns a function able to construct connections to remote Operators
-// TODO(prateek-ref): make this take an input identifier for the node being operated upon
-// TODO(prateek-ref): default connection timeout was 2mins
 type OperatorClientFn func() (*grpc.ClientConn, m3em.OperatorClient, error)
 
 // HeartbeatOptions are the knobs to control heartbeating behavior

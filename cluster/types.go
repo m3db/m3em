@@ -28,58 +28,39 @@ import (
 	"github.com/m3db/m3x/instrument"
 )
 
-// TODO(prateek): add 'transitioning' status here
-
 // Status indicates the different states a Cluster can be in. Refer to the
 // state diagram below to understand transitions. Note, all states can transition
 // to `ClusterStatusError`, these edges are skipped below.
-//
-//                              ┌───────────────────────────Teardown()────┐
-//                              │                               │         │
-//                              ▼                               │         │
-//                    ╔══════════════════╗                      │         │
-//                    ║                  ║                      │         │
-//                    ║  Uninitialized   ║─────┐      ╔══════════════════╗│
-//                    ║                  ║     │      ║                  ║│
-//                    ╚══════════════════╝     │      ║      Error       ║│
-//                              ▲              │      ║                  ║│
-//                              │              │      ╚══════════════════╝│
-//                              ├────┐      Setup()             │         │
-//                              │    │         ▼                │         │
-//                              │    ╠══════════════════╗       │         │
-//                              │    ║                  ║       │         │
-//                   Teardown() │    ║      Setup       ║◀────Reset()     │
-//                      ┌───────┘    ║                  ║        │        │
-//                      │       ┌───▶╚═══╦══════════════╝        │        │
-//                      │       │        │     │                 │        │
-//                      │     Reset()────┘     │ Initialize()    │        │
-//                      │       │              └────────┐        │        │
-//                      │       │                       │        │        │
-//                      │       │                       │        │        │
-//                      │       │                       ▼        │        │
-//            ╔═════════╩═══════╩╗   Start()           ╔═════════╩════════╣
-//            ║                  ║   StartInitialized()║                  ║
-//         ┌──║     Running      ║◀────────────────────║   Initialized    ║──┐
-//         │  ║                  ║                     ║                  ║  │
-//         │  ╚══════════════════╩───────Stop()───────▶╚══════════════════╝  │
-// AddNode()        ▲                                        ▲           │
-// RemoveNode()     │                                        │     AddNode()
-// ReplaceNode()────┘                                        └─────RemoveNode()
-//                                                                     ReplaceNode()
+//              ╔══════════════════╗
+//              ║                  ║
+//              ║  Uninitialized   ║────────────Setup()────┐
+//              ║                  ║                       │
+//              ╚══════════════════╝                       │
+//                        ▲                                │
+//                        │                                │
+//                        │                                │
+//                        │   Teardown()                   │
+//                        ├────────────────────────┐       │
+//                        │                        │       │
+//                ┌───────┘                        │       │
+//                │                                │       ▼
+//          ╔═════╩════════════╗◀────Start()─────╦═╩════════════════╗
+//          ║                  ║                 ║                  ║
+//       ┌──║     Running      ║                 ║      Setup       ║──┐
+//       │  ║                  ║                 ║                  ║  │
+//       │  ╚══════════════════╝──────Stop()────▶╚══════════════════╝  │
+// AddInstance()      ▲                                    ▲    AddInstance()
+// RemoveInstance()   │                                    │    RemoveInstance()
+// ReplaceInstance()──┘                                    └────ReplaceInstance()
 type Status int
 
 const (
 	// ClusterStatusUninitialized refers to the state of an un-initialized cluster.
 	ClusterStatusUninitialized Status = iota
 
-	// ClusterStatusSetup refers to the state of a cluster whose nodes have been
-	// setup. In this state, the nodes are not running, and the cluster services
-	// do not have a defined placement.
-	ClusterStatusSetup
-
-	// ClusterStatusInitialized refers to the state of a cluster whose nodes have
+	// ClusterStatusSetup refers to the state of a cluster whose nodes have
 	// been setup, and the cluster has an assigned placement.
-	ClusterStatusInitialized
+	ClusterStatusSetup
 
 	// ClusterStatusRunning refers to the state of a cluster with running nodes.
 	// There is no restriction on the number of nodes running, or assigned within
@@ -92,11 +73,11 @@ const (
 
 // Cluster is a collection of ServiceNodes with a m3cluster Placement
 type Cluster interface {
-	// Setup the nodes in the Environment provided during construction.
-	Setup() error
+	// Setup sets up the service placement for the specified numNodes.
+	Setup(numNodes int) ([]node.ServiceNode, error)
 
-	// Initialize initializes service placement for the specified numNodes.
-	Initialize(numNodes int) ([]node.ServiceNode, error)
+	// Teardown releases the resources acquired during Setup().
+	Teardown() error
 
 	// AddNode adds the specified node to the service placement. It does
 	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
@@ -107,25 +88,28 @@ type Cluster interface {
 	RemoveNode(node.ServiceNode) error
 
 	// ReplaceNode replaces the specified node with new node(s) in the service
-	// placement. It does NOT alter the state of the TestNode (i.e. does not start/stop it).
-	// TODO(prateek-ref): use new interface for replace
-	ReplaceNode(oldNode node.ServiceNode) (node.ServiceNode, error)
+	// placement. It does NOT alter the state of the ServiceNode (i.e. does not start/stop it).
+	ReplaceNode(oldNode node.ServiceNode) ([]node.ServiceNode, error)
 
-	// Spares returns the nodes available in the environment which are not part of the
-	// cluster (i.e. placement).
-	Spares() []node.ServiceNode
-
-	// Teardown releases the resources acquired during Setup().
-	Teardown() error
-
-	// StartInitialized starts any nodes which have been initialized and are not running.
-	StartInitialized() error
-
-	// Start starts all nodes known in the environment, regardless of initialization.
+	// Start starts all nodes used in current service placement.
 	Start() error
 
-	// Stop stops any running nodes in the environment.
+	// Stop stops all nodes used in current service placement.
 	Stop() error
+
+	// SpareNodes returns the list of known nodes which are not part of the defined placement
+	// in the cluster.
+	SpareNodes() []node.ServiceNode
+
+	// ActiveNodes returns the list of known nodes which are part of the defined placement
+	// in the cluster.
+	ActiveNodes() []node.ServiceNode
+
+	// KnownNodes returns the list of known nodes
+	KnownNodes() []node.ServiceNode
+
+	// Placement returns the current placement
+	Placement() services.ServicePlacement
 
 	// Status returns the cluster status
 	Status() Status
@@ -198,4 +182,6 @@ type Options interface {
 	// NodeConcurrency returns the number of nodes to operate upon
 	// concurrently
 	NodeConcurrency() int
+
+	// TODO(prateek-ref): cluster listeners
 }

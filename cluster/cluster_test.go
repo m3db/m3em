@@ -34,11 +34,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const defaultRandSeed = 1234567890
+const (
+	defaultRandSeed         = 1234567890
+	defaultTestSessionToken = "someLongString"
+)
 
 var (
-	defaultRandomVar        = rand.New(rand.NewSource(int64(defaultRandSeed)))
-	defaultTestSessionToken = "someLongString"
+	defaultRandomVar = rand.New(rand.NewSource(int64(defaultRandSeed)))
 )
 
 func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.PlacementService) Options {
@@ -49,10 +51,11 @@ func newDefaultClusterTestOptions(ctrl *gomock.Controller, psvc services.Placeme
 		SetReplication(10).
 		SetServiceBuild(mockBuild).
 		SetServiceConfig(mockConf).
-		SetSessionToken(defaultTestSessionToken)
+		SetSessionToken(defaultTestSessionToken).
+		SetPlacementService(psvc)
 }
 
-func newMockServiceNode(ctrl *gomock.Controller) node.ServiceNode {
+func newMockServiceNode(ctrl *gomock.Controller) *mocknode.MockServiceNode {
 	r := defaultRandomVar
 	node := mocknode.NewMockServiceNode(ctrl)
 	node.EXPECT().ID().AnyTimes().Return(fmt.Sprintf("%d", r.Int()))
@@ -71,29 +74,23 @@ type expectNodeCallTypes struct {
 	expectStart    bool
 }
 
-func addDefaultStatusExpects(nodes []node.ServiceNode, calls expectNodeCallTypes) []node.ServiceNode {
-	for _, node := range nodes {
-		mNode := node.(*mocknode.MockServiceNode)
-		if calls.expectSetup {
-			mNode.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-		}
-		if calls.expectTeardown {
-			mNode.EXPECT().Teardown().AnyTimes().Return(nil)
-		}
-		if calls.expectStop {
-			mNode.EXPECT().Stop().AnyTimes().Return(nil)
-		}
-		if calls.expectStart {
-			mNode.EXPECT().Start().AnyTimes().Return(nil)
-		}
-	}
-	return nodes
-}
-
-func newMockServiceNodes(ctrl *gomock.Controller, numNodes int) []node.ServiceNode {
+func newMockServiceNodes(ctrl *gomock.Controller, numNodes int, calls expectNodeCallTypes) []node.ServiceNode {
 	nodes := make([]node.ServiceNode, 0, numNodes)
 	for i := 0; i < numNodes; i++ {
-		nodes = append(nodes, newMockServiceNode(ctrl))
+		mNode := newMockServiceNode(ctrl)
+		if calls.expectSetup {
+			mNode.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		}
+		if calls.expectTeardown {
+			mNode.EXPECT().Teardown().Return(nil)
+		}
+		if calls.expectStop {
+			mNode.EXPECT().Stop().Return(nil)
+		}
+		if calls.expectStart {
+			mNode.EXPECT().Start().Return(nil)
+		}
+		nodes = append(nodes, mNode)
 	}
 	return nodes
 }
@@ -107,11 +104,7 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	defer ctrl.Finish()
 	mockPlacementService := newMockPlacementService(ctrl)
 	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
-	expectCalls := expectNodeCallTypes{
-		expectSetup:    true,
-		expectTeardown: true,
-	}
-	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+	nodes := newMockServiceNodes(ctrl, 5, expectNodeCallTypes{expectTeardown: true})
 	clusterIface, err := New(nodes, opts)
 	require.NoError(t, err)
 	cluster := clusterIface.(*svcCluster)
@@ -119,11 +112,9 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	cluster.status = ClusterStatusError
 
 	// illegal transitions
-	require.Error(t, cluster.Setup())
-	_, err = cluster.Initialize(1)
+	_, err = cluster.Setup(1)
 	require.Error(t, err)
 	require.Error(t, cluster.Start())
-	require.Error(t, cluster.StartInitialized())
 	require.Error(t, cluster.Stop())
 	_, err = cluster.AddNode()
 	require.Error(t, err)
@@ -137,7 +128,136 @@ func TestClusterErrorStatusTransitions(t *testing.T) {
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 }
 
-func TestClusterUninitializedStatusTransitions(t *testing.T) {
+func TestClusterUninitializedToSetupTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		mpsvc                = mockPlacementService.(*services.MockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{expectSetup: true})
+		clusterIface, err    = New(nodes, opts)
+	)
+
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	// fake placement
+	pi, ok := nodes[0].(services.PlacementInstance)
+	require.True(t, ok)
+	mockNode, ok := nodes[0].(*mocknode.MockServiceNode)
+	require.True(t, ok)
+	mockNode.EXPECT().SetShards(gomock.Any())
+	mockPlacement := services.NewMockServicePlacement(ctrl)
+	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{pi}).AnyTimes()
+
+	// setup (legal)
+	gomock.InOrder(
+		mpsvc.EXPECT().Placement().Return(nil, 0, nil),
+		mpsvc.EXPECT().Delete().Return(nil),
+		mpsvc.EXPECT().
+			BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(mockPlacement, nil),
+	)
+
+	_, err = cluster.Setup(1)
+	require.NoError(t, err)
+	require.Equal(t, ClusterStatusSetup, cluster.Status())
+}
+
+func TestClusterUninitializedErrorTransitions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{})
+		clusterIface, err    = New(nodes, opts)
+	)
+
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	// illegal transitions
+	require.Error(t, cluster.Start())
+	require.Error(t, cluster.Stop())
+	_, err = cluster.AddNode()
+	require.Error(t, err)
+	err = cluster.RemoveNode(nil)
+	require.Error(t, err)
+	_, err = cluster.ReplaceNode(nil)
+	require.Error(t, err)
+}
+
+func TestClusterSetupIllegalTransitions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{})
+		clusterIface, err    = New(nodes, opts)
+	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	cluster.status = ClusterStatusSetup
+	require.Error(t, cluster.Stop())
+}
+
+func TestClusterSetupAddNodeTransition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		mpsvc                = mockPlacementService.(*services.MockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		expectCalls          = expectNodeCallTypes{}
+		nodes                = newMockServiceNodes(ctrl, 5, expectCalls)
+		clusterIface, err    = New(nodes, opts)
+	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	// fake placement
+	pi, ok := nodes[0].(services.PlacementInstance)
+	require.True(t, ok)
+	mockNode, ok := nodes[0].(*mocknode.MockServiceNode)
+	require.True(t, ok)
+	mockNode.EXPECT().SetShards(gomock.Any())
+	mockPlacement := services.NewMockServicePlacement(ctrl)
+	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{pi}).AnyTimes()
+	mpsvc.EXPECT().AddInstance(gomock.Any()).Return(mockPlacement, mockNode, nil)
+
+	// ensure mockNode is in the spares
+	found := false
+	for _, inst := range cluster.SpareNodes() {
+		if inst.ID() == mockNode.ID() {
+			require.False(t, found)
+			found = true
+		}
+	}
+	require.True(t, found)
+
+	// now add the mockNode using the faked stuff above
+	cluster.status = ClusterStatusSetup
+	newNode, err := cluster.AddNode()
+	require.NoError(t, err)
+	require.Equal(t, mockNode.ID(), newNode.ID())
+
+	// ensure mockNode is not in spares
+	for _, inst := range cluster.SpareNodes() {
+		if inst.ID() == mockNode.ID() {
+			require.Fail(t, "found node with id: %s", mockNode.ID())
+		}
+	}
+}
+
+func TestClusterSetupToStart(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	var (
@@ -145,261 +265,258 @@ func TestClusterUninitializedStatusTransitions(t *testing.T) {
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
 		expectCalls          = expectNodeCallTypes{expectSetup: true}
-		nodes                = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
+		nodes                = newMockServiceNodes(ctrl, 5, expectCalls)
 		clusterIface, err    = New(nodes, opts)
 	)
 	require.NoError(t, err)
 	cluster := clusterIface.(*svcCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
-	// illegal transitions
-	require.Error(t, cluster.Start())
-	require.Error(t, cluster.StartInitialized())
-	require.Error(t, cluster.Stop())
-	_, err = cluster.AddNode()
-	require.Error(t, err)
-	err = cluster.RemoveNode(nil)
-	require.Error(t, err)
-	_, err = cluster.ReplaceNode(nil)
-	require.Error(t, err)
+	// fake placement
+	pi, ok := nodes[0].(services.PlacementInstance)
+	require.True(t, ok)
+	mockNode, ok := nodes[0].(*mocknode.MockServiceNode)
+	require.True(t, ok)
+	mockNode.EXPECT().SetShards(gomock.Any())
+	mockNode.EXPECT().Start().Return(nil)
+	mockPlacement := services.NewMockServicePlacement(ctrl)
+	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{pi}).AnyTimes()
 
 	// setup (legal)
-	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
-	mpsvc.EXPECT().Delete().Return(nil)
-	require.NoError(t, cluster.Setup())
-	require.Equal(t, ClusterStatusSetup, cluster.Status())
-}
-
-func TestClusterSetupStatusTransitions(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	var (
-		mockPlacementService = newMockPlacementService(ctrl)
-		mpsvc                = mockPlacementService.(*services.MockPlacementService)
-		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		expectCalls          = expectNodeCallTypes{
-			expectSetup:    true,
-			expectTeardown: true,
-		}
-		nodes        = addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-		cluster, err = New(nodes, opts)
+	gomock.InOrder(
+		mpsvc.EXPECT().Placement().Return(nil, 0, nil),
+		mpsvc.EXPECT().Delete().Return(nil),
+		mpsvc.EXPECT().
+			BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(mockPlacement, nil),
 	)
 
+	_, err = cluster.Setup(1)
 	require.NoError(t, err)
-	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
-	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
-	mpsvc.EXPECT().Delete().Return(nil)
-
-	require.NoError(t, cluster.Setup())
 	require.Equal(t, ClusterStatusSetup, cluster.Status())
 
-	// illegal transitions
-	require.Error(t, cluster.Start())
-	require.Error(t, cluster.StartInitialized())
-	require.Error(t, cluster.Stop())
-	_, err = cluster.AddNode()
-	require.Error(t, err)
-	err = cluster.RemoveNode(nil)
-	require.Error(t, err)
-	_, err = cluster.ReplaceNode(nil)
-	require.Error(t, err)
-
-	// initialize (legal)
-	mpsvc.EXPECT().BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-	insts, err := cluster.Initialize(2)
-	require.NoError(t, err)
-	require.Equal(t, 2, len(insts))
-
-	// teardown (legal)
-	mCluster := cluster.(*svcCluster)
-	mCluster.status = ClusterStatusSetup
-	require.NoError(t, mCluster.Teardown())
-	require.Equal(t, ClusterStatusUninitialized, mCluster.Status())
-}
-
-func TestClusterRunningStatusTransitions(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockPlacementService := newMockPlacementService(ctrl).(*services.MockPlacementService)
-	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
-	expectCalls := expectNodeCallTypes{
-		expectSetup:    true,
-		expectTeardown: true,
-		expectStop:     true,
-	}
-
-	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-	clusterIface, err := New(nodes, opts)
-	require.NoError(t, err)
-	cluster := clusterIface.(*svcCluster)
-	cluster.status = ClusterStatusRunning
-
-	// illegal transitions
-	require.Error(t, cluster.Setup())
-	require.Error(t, cluster.Start())
-	require.Error(t, cluster.StartInitialized())
-	_, err = cluster.Initialize(1)
-	require.Error(t, err)
-
-	// stop (legal)
-	cluster.status = ClusterStatusRunning
-	require.NoError(t, cluster.Stop())
-	require.Equal(t, ClusterStatusInitialized, cluster.Status())
-
-	// teardown (legal)
-	cluster.status = ClusterStatusRunning
-	require.NoError(t, cluster.Teardown())
-	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
-
-	// add (legal)
-	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, nil)
-	cluster.status = ClusterStatusRunning
-	added, err := cluster.AddNode()
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusRunning, cluster.Status())
-
-	// replace (legal)
-	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
-	cluster.status = ClusterStatusRunning
-	replaced, err := cluster.ReplaceNode(added)
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusRunning, cluster.Status())
-
-	// remove (legal)
-	mockPlacementService.EXPECT().RemoveInstance(gomock.Any()).Return(nil, nil)
-	cluster.status = ClusterStatusRunning
-	err = cluster.RemoveNode(replaced)
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusRunning, cluster.Status())
-}
-
-func TestClusterInitializedStatusTransitions(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockPlacementService := newMockPlacementService(ctrl).(*services.MockPlacementService)
-	opts := newDefaultClusterTestOptions(ctrl, mockPlacementService)
-	expectCalls := expectNodeCallTypes{
-		expectTeardown: true,
-		expectStart:    true,
-	}
-
-	nodes := addDefaultStatusExpects(newMockServiceNodes(ctrl, 5), expectCalls)
-	clusterIface, err := New(nodes, opts)
-	require.NoError(t, err)
-	cluster := clusterIface.(*svcCluster)
-	cluster.status = ClusterStatusInitialized
-
-	// illegal transitions
-	require.Error(t, cluster.Setup())
-	require.Error(t, cluster.Stop())
-	_, err = cluster.Initialize(1)
-	require.Error(t, err)
-
-	// start (legal)
-	cluster.status = ClusterStatusInitialized
+	// now ensure start is called
 	require.NoError(t, cluster.Start())
 	require.Equal(t, ClusterStatusRunning, cluster.Status())
-
-	// StartInitialized (legal)
-	cluster.status = ClusterStatusInitialized
-	require.NoError(t, cluster.StartInitialized())
-	require.Equal(t, ClusterStatusRunning, cluster.Status())
-
-	// teardown (legal)
-	cluster.status = ClusterStatusInitialized
-	require.NoError(t, cluster.Teardown())
-	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
-
-	// add (legal)
-	mockPlacementService.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, nil)
-	cluster.status = ClusterStatusInitialized
-	added, err := cluster.AddNode()
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusInitialized, cluster.Status())
-
-	// replace (legal)
-	mockPlacementService.EXPECT().ReplaceInstance(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
-	cluster.status = ClusterStatusInitialized
-	replaced, err := cluster.ReplaceNode(added)
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusInitialized, cluster.Status())
-
-	// remove (legal)
-	mockPlacementService.EXPECT().RemoveInstance(gomock.Any()).Return(nil, nil)
-	cluster.status = ClusterStatusInitialized
-	err = cluster.RemoveNode(replaced)
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusInitialized, cluster.Status())
 }
 
-func TestClusterSetup(t *testing.T) {
+func TestClusterSetupToRemoveNode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	var (
 		mockPlacementService = newMockPlacementService(ctrl)
 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		nodes                = newMockServiceNodes(ctrl, 5)
+		expectCalls          = expectNodeCallTypes{expectSetup: true}
+		nodes                = newMockServiceNodes(ctrl, 5, expectCalls)
+		clusterIface, err    = New(nodes, opts)
 	)
-	for _, node := range nodes {
-		mi := node.(*mocknode.MockServiceNode)
-		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	}
-	cluster, err := New(nodes, opts)
 	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
-	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
-	mpsvc.EXPECT().Delete().Return(nil)
-	require.NoError(t, cluster.Setup())
-	require.Equal(t, ClusterStatusSetup, cluster.Status())
-}
+	// fake placement
+	pi, ok := nodes[0].(services.PlacementInstance)
+	require.True(t, ok)
+	mockNode, ok := nodes[0].(*mocknode.MockServiceNode)
+	require.True(t, ok)
+	mockNode.EXPECT().SetShards(gomock.Any())
+	mockPlacement := services.NewMockServicePlacement(ctrl)
+	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{pi}).AnyTimes()
 
-func TestClusterInitialize(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	var (
-		mockPlacementService = newMockPlacementService(ctrl)
-		mpsvc                = mockPlacementService.(*services.MockPlacementService)
-		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
-		nodes                = newMockServiceNodes(ctrl, 5)
+	// setup (legal)
+	gomock.InOrder(
+		mpsvc.EXPECT().Placement().Return(nil, 0, nil),
+		mpsvc.EXPECT().Delete().Return(nil),
+		mpsvc.EXPECT().
+			BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(mockPlacement, nil),
 	)
-	for _, node := range nodes {
-		mi := node.(*mocknode.MockServiceNode)
-		mi.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	}
-	cluster, err := New(nodes, opts)
-	require.NoError(t, err)
-	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
 
-	mpsvc.EXPECT().Placement().Return(nil, 0, nil)
-	mpsvc.EXPECT().Delete().Return(nil)
-	require.NoError(t, cluster.Setup())
+	setupNodes, err := cluster.Setup(1)
+	require.NoError(t, err)
 	require.Equal(t, ClusterStatusSetup, cluster.Status())
+	require.Equal(t, 1, len(setupNodes))
+	require.Equal(t, mockNode.ID(), setupNodes[0].ID())
 
-	_, err = cluster.Initialize(10)
-	require.Error(t, err)
+	mockNode.EXPECT().SetShards(nil)
+	mockPlacement = services.NewMockServicePlacement(ctrl)
+	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{}).AnyTimes()
+	mpsvc.EXPECT().RemoveInstance(setupNodes[0].ID()).Return(mockPlacement, nil)
 
-	mpsvc.EXPECT().BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-	usedNodes, err := cluster.Initialize(4)
+	err = cluster.RemoveNode(setupNodes[0])
 	require.NoError(t, err)
-	require.Equal(t, 4, len(usedNodes))
 
-	spares := cluster.Spares()
-	require.Equal(t, 1, len(spares))
-	spare := spares[0]
-	for _, node := range usedNodes {
-		require.NotEqual(t, node.ID(), spare.ID())
-	}
-
-	// test StartInitialized
-	for _, node := range nodes {
-		if spare.ID() != node.ID() {
-			mi := node.(*mocknode.MockServiceNode)
-			mi.EXPECT().Start().Return(nil)
+	// ensure node is in the spares list
+	found := false
+	for _, node := range cluster.SpareNodes() {
+		if node.ID() == mockNode.ID() {
+			require.False(t, found)
+			found = true
 		}
 	}
-
-	require.NoError(t, cluster.StartInitialized())
-	require.Equal(t, ClusterStatusRunning, cluster.Status())
+	require.True(t, found)
 }
+
+func TestClusterSetupToReplaceNode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		mpsvc                = mockPlacementService.(*services.MockPlacementService)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		expectCalls          = expectNodeCallTypes{expectSetup: true}
+		nodes                = newMockServiceNodes(ctrl, 5, expectCalls)
+		clusterIface, err    = New(nodes, opts)
+	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	// fake placement
+	pi, ok := nodes[0].(services.PlacementInstance)
+	require.True(t, ok)
+	mockNode, ok := nodes[0].(*mocknode.MockServiceNode)
+	require.True(t, ok)
+	mockNode.EXPECT().SetShards(gomock.Any())
+	mockPlacement := services.NewMockServicePlacement(ctrl)
+	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{pi}).AnyTimes()
+
+	// setup (legal)
+	gomock.InOrder(
+		mpsvc.EXPECT().Placement().Return(nil, 0, nil),
+		mpsvc.EXPECT().Delete().Return(nil),
+		mpsvc.EXPECT().
+			BuildInitialPlacement(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(mockPlacement, nil),
+	)
+
+	setupNodes, err := cluster.Setup(1)
+	require.NoError(t, err)
+	require.Equal(t, ClusterStatusSetup, cluster.Status())
+	require.Equal(t, 1, len(setupNodes))
+	require.Equal(t, mockNode.ID(), setupNodes[0].ID())
+
+	// create new mock placement for replace
+	mockNode.EXPECT().SetShards(nil)
+	mockPlacement = services.NewMockServicePlacement(ctrl)
+	replacementInstances := []services.PlacementInstance{
+		nodes[1].(services.PlacementInstance),
+		nodes[2].(services.PlacementInstance),
+	}
+	mockPlacement.EXPECT().Instances().Return(replacementInstances).AnyTimes()
+	mockNode1 := nodes[1].(*mocknode.MockServiceNode)
+	mockNode2 := nodes[2].(*mocknode.MockServiceNode)
+	mockNode1.EXPECT().SetShards(gomock.Any())
+	mockNode2.EXPECT().SetShards(gomock.Any())
+	mpsvc.EXPECT().
+		ReplaceInstance(setupNodes[0].ID(), gomock.Any()).
+		Return(mockPlacement, replacementInstances, nil)
+
+	replacementNodes, err := cluster.ReplaceNode(setupNodes[0])
+	require.NoError(t, err)
+	require.Equal(t, 2, len(replacementNodes))
+}
+
+func TestClusterRunningIllegalTransitions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{})
+		clusterIface, err    = New(nodes, opts)
+	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	cluster.status = ClusterStatusRunning
+	require.Error(t, cluster.Start())
+	_, err = cluster.Setup(1)
+	require.Error(t, err)
+}
+
+func TestClusterRunningToStop(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{})
+		clusterIface, err    = New(nodes, opts)
+	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	cluster.status = ClusterStatusRunning
+	mockNode, ok := nodes[0].(*mocknode.MockServiceNode)
+	require.True(t, ok)
+	mockNode.EXPECT().Stop().Return(nil)
+	usedIDMap := map[string]node.ServiceNode{
+		mockNode.ID(): mockNode,
+	}
+	cluster.usedNodes = usedIDMap
+
+	require.NoError(t, cluster.Stop())
+}
+
+func TestClusterRunningToTeardown(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var (
+		mockPlacementService = newMockPlacementService(ctrl)
+		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{expectTeardown: true})
+		clusterIface, err    = New(nodes, opts)
+	)
+	require.NoError(t, err)
+	cluster := clusterIface.(*svcCluster)
+	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+	cluster.status = ClusterStatusRunning
+	require.NoError(t, cluster.Teardown())
+}
+
+// func TestClusterRunningAddNode(t *testing.T) {
+// 	ctrl := gomock.NewController(t)
+// 	defer ctrl.Finish()
+// 	var (
+// 		mockPlacementService = newMockPlacementService(ctrl)
+// 		mpsvc                = mockPlacementService.(*services.MockPlacementService)
+// 		opts                 = newDefaultClusterTestOptions(ctrl, mockPlacementService)
+// 		nodes                = newMockServiceNodes(ctrl, 5, expectNodeCallTypes{})
+// 		clusterIface, err    = New(nodes, opts)
+// 	)
+// 	require.NoError(t, err)
+// 	cluster := clusterIface.(*svcCluster)
+// 	require.Equal(t, ClusterStatusUninitialized, cluster.Status())
+
+// 	cluster.status = ClusterStatusRunning
+// 	mockNode := nodes[0].(*mocknode.MockServiceNode)
+// 	mockNodeAsPI := nodes[0].(services.PlacementInstance)
+// 	usedIDMap := map[string]node.ServiceNode{
+// 		mockNode.ID(): mockNode,
+// 	}
+// 	cluster.usedNodes = usedIDMap
+// 	require.NoError(t, cluster.removeFromSparesWithLock(nodes[0:1]))
+
+// 	// fake placement
+// 	fakeShards := shard.NewShards([]shard.Shard{shard.NewShard(1)})
+// 	mockNewNode := nodes[1].(*mocknode.MockServiceNode)
+// 	mockNewNode.EXPECT().Shards().Return(fakeShards)
+// 	mockNewNodeAsPI := nodes[1].(services.PlacementInstance)
+// 	mockNewNode.EXPECT().SetShards(fakeShards)
+// 	mockPlacement := services.NewMockServicePlacement(ctrl)
+// 	instancesInMockPlacement := []services.PlacementInstance{
+// 		mockNodeAsPI,
+// 		mockNewNodeAsPI,
+// 	}
+// 	mockPlacement.EXPECT().Instances().Return(instancesInMockPlacement).AnyTimes()
+// 	mpsvc.EXPECT().AddInstance(gomock.Any()).Return(mockPlacement, mockNewNode, nil)
+
+// 	newNode, err := cluster.AddNode()
+// 	require.NoError(t, err)
+// 	require.Equal(t, mockNewNodeAsPI.ID(), newNode.ID())
+// }
