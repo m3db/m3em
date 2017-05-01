@@ -183,5 +183,11 @@ type Options interface {
 	// concurrently
 	NodeConcurrency() int
 
-	// TODO(prateek-ref): cluster listeners
+	// SetNodeListener sets default node listener
+	SetNodeListener(node.Listener) Options
+
+	// NodeListener returns the node listener
+	NodeListener() node.Listener
+
+	// TODO(prateek-ref): MustFn
 }

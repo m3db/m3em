@@ -196,6 +196,7 @@ func (c *svcCluster) initWithLock() error {
 		svcConf         = c.opts.ServiceConfig()
 		sessionToken    = c.opts.SessionToken()
 		sessionOverride = c.opts.SessionOverride()
+		listener        = c.opts.NodeListener()
 		lock            sync.Mutex
 		multiErr        xerrors.MultiError
 	)
@@ -208,6 +209,10 @@ func (c *svcCluster) initWithLock() error {
 			multiErr = multiErr.Add(err)
 			lock.Unlock()
 			return
+		}
+		if listener != nil {
+			node.RegisterListener(listener)
+			// TODO(prateek): track listenerID returned in cluster struct, cleanup in Teardown()
 		}
 	})
 	executor.run()

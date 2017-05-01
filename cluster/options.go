@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/m3db/m3em/build"
+	"github.com/m3db/m3em/node"
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3x/instrument"
@@ -46,6 +47,7 @@ type clusterOpts struct {
 	replication     int
 	numShards       int
 	concurrency     int
+	listener        node.Listener
 }
 
 // NewOptions returns a new Options object
@@ -165,4 +167,13 @@ func (o clusterOpts) SetNodeConcurrency(c int) Options {
 
 func (o clusterOpts) NodeConcurrency() int {
 	return o.concurrency
+}
+
+func (o clusterOpts) SetNodeListener(l node.Listener) Options {
+	o.listener = l
+	return o
+}
+
+func (o clusterOpts) NodeListener() node.Listener {
+	return o.listener
 }
