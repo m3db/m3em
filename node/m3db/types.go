@@ -13,6 +13,9 @@ type Node interface {
 	// Health returns the health for this node
 	Health() (NodeHealth, error)
 
+	// Bootstrapped returns whether the node is bootstrapped
+	Bootstrapped() bool
+
 	// TODO(prateek): add more m3db service endpoints in ServiceNode
 	// - query service observable properties (nowFn, detailed_status)
 	// - set nowFn offset

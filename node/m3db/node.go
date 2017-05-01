@@ -92,3 +92,11 @@ func (n *m3dbNode) Health() (NodeHealth, error) {
 	err = retrier.Attempt(attemptFn)
 	return healthResult, err
 }
+
+func (n *m3dbNode) Bootstrapped() bool {
+	health, err := n.Health()
+	if err != nil {
+		return false
+	}
+	return health.Bootstrapped
+}
