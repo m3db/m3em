@@ -30,7 +30,6 @@ import (
 	mtime "github.com/m3db/m3em/time"
 
 	"github.com/m3db/m3cluster/services"
-	"github.com/m3db/m3cluster/shard"
 	xerrors "github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 	gu "github.com/nu7hatch/gouuid"
@@ -48,14 +47,9 @@ var (
 
 type svcNode struct {
 	sync.Mutex
+	services.PlacementInstance
 	logger            xlog.Logger
 	opts              Options
-	id                string
-	rack              string
-	zone              string
-	weight            uint32
-	endpoint          string
-	shards            shard.Shards
 	status            Status
 	currentBuild      build.ServiceBuild
 	currentConf       build.ServiceConfiguration
@@ -88,15 +82,10 @@ func New(
 
 	var (
 		retNode = &svcNode{
-			logger:   opts.InstrumentOptions().Logger(),
-			opts:     opts,
-			id:       node.ID(),
-			rack:     node.Rack(),
-			zone:     node.Zone(),
-			weight:   node.Weight(),
-			endpoint: node.Endpoint(),
-			shards:   node.Shards(),
-			status:   StatusUninitialized,
+			logger:            opts.InstrumentOptions().Logger(),
+			opts:              opts,
+			PlacementInstance: node,
+			status:            StatusUninitialized,
 		}
 		listeners      = newListenerGroup(retNode)
 		hbUUID         = string(uuid[:])
@@ -125,88 +114,7 @@ func New(
 func (i *svcNode) String() string {
 	i.Lock()
 	defer i.Unlock()
-	return fmt.Sprintf(
-		"ServiceNode[ID=%s, Rack=%s, Zone=%s, Weight=%d, Endpoint=%s, Shards=%s]",
-		i.id, i.rack, i.zone, i.weight, i.endpoint, i.shards.String(),
-	)
-}
-
-func (i *svcNode) ID() string {
-	i.Lock()
-	defer i.Unlock()
-	return i.id
-}
-
-func (i *svcNode) SetID(id string) services.PlacementInstance {
-	i.Lock()
-	defer i.Unlock()
-	i.id = id
-	return i
-}
-
-func (i *svcNode) Rack() string {
-	i.Lock()
-	defer i.Unlock()
-	return i.rack
-}
-
-func (i *svcNode) SetRack(r string) services.PlacementInstance {
-	i.Lock()
-	defer i.Unlock()
-	i.rack = r
-	return i
-}
-
-func (i *svcNode) Zone() string {
-	i.Lock()
-	defer i.Unlock()
-	return i.zone
-}
-
-func (i *svcNode) SetZone(z string) services.PlacementInstance {
-	i.Lock()
-	defer i.Unlock()
-	i.zone = z
-	return i
-}
-
-func (i *svcNode) Weight() uint32 {
-	i.Lock()
-	defer i.Unlock()
-	return i.weight
-}
-
-func (i *svcNode) SetWeight(w uint32) services.PlacementInstance {
-	i.Lock()
-	defer i.Unlock()
-	i.weight = w
-	return i
-}
-
-func (i *svcNode) Endpoint() string {
-	i.Lock()
-	defer i.Unlock()
-	return i.endpoint
-}
-
-func (i *svcNode) SetEndpoint(ip string) services.PlacementInstance {
-	i.Lock()
-	defer i.Unlock()
-	i.endpoint = ip
-	return i
-}
-
-func (i *svcNode) Shards() shard.Shards {
-	i.Lock()
-	defer i.Unlock()
-	return i.shards
-}
-
-func (i *svcNode) SetShards(s shard.Shards) services.PlacementInstance {
-	i.Lock()
-	defer i.Unlock()
-	i.shards = s
-	return i
+	return fmt.Sprintf("ServiceNode %s", i.PlacementInstance.String())
 }
 
 func (i *svcNode) Setup(
