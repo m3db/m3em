@@ -69,7 +69,12 @@ func Run() {
 	if err != nil {
 		logger.Fatalf("could not connect to metrics: %v", err)
 	}
-	scope, _ := tally.NewCachedRootScope(conf.Metrics.Prefix, nil, reporter, time.Second, tally.DefaultSeparator)
+	scope, scopeCloser := tally.NewRootScope(tally.ScopeOptions{
+		Prefix:         conf.Metrics.Prefix,
+		CachedReporter: reporter,
+	}, time.Second)
+	defer scopeCloser.Close()
+
 	listener, err := tcp.NewTCPListener(conf.Server.ListenAddress, 3*time.Minute)
 	if err != nil {
 		logger.Fatalf("could not create TCP Listener: %v", err)
