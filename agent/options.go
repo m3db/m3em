@@ -21,16 +21,14 @@
 package agent
 
 import (
+	"fmt"
+
 	"github.com/m3db/m3em/os/exec"
 
 	"github.com/m3db/m3x/instrument"
 )
 
 var (
-	defaultExecGenFn = func(binary string, config string) (string, []string) {
-		return binary, []string{"-f", config}
-	}
-
 	defaultNoErrorFn = func() error {
 		return nil
 	}
@@ -49,10 +47,21 @@ type opts struct {
 func NewOptions(io instrument.Options) Options {
 	return &opts{
 		iopts:     io,
-		execGenFn: defaultExecGenFn,
 		initFn:    defaultNoErrorFn,
 		releaseFn: defaultNoErrorFn,
 	}
+}
+
+func (o *opts) Validate() error {
+	if o.execGenFn == nil {
+		return fmt.Errorf("ExecGenFn is not set")
+	}
+
+	if o.workingDir == "" {
+		return fmt.Errorf("WorkingDirectory is not set")
+	}
+
+	return nil
 }
 
 func (o *opts) SetInstrumentOptions(io instrument.Options) Options {

@@ -25,75 +25,25 @@ package integration
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
-	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/m3db/m3cluster/services/placement"
-	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
-	hb "github.com/m3db/m3em/generated/proto/heartbeat"
-	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/node"
 
-	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 )
 
 func TestProcessExecutionHeartbeating(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	targetLocation := newTempDir(t)
-	defer os.RemoveAll(targetLocation)
 
-	iopts := instrument.NewOptions()
-	// create agent listener, get free port from OS
-	agentListener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer agentListener.Close()
+	th := newTestHarnessWithHearbeat(t)
 
-	// create heartbeat listener, get free port from OS
-	heartbeatListener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer heartbeatListener.Close()
-
-	// create agent
-	aOpts := agent.NewOptions(iopts).SetWorkingDirectory(targetLocation)
-	server := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
-	agentService, err := agent.New(aOpts)
-	require.NoError(t, err)
-	m3em.RegisterOperatorServer(server, agentService)
-	go func() {
-		server.Serve(agentListener)
-	}()
-	defer server.GracefulStop()
-
-	// create new heartbeat router
-	hbRouter := node.NewHeartbeatRouter(heartbeatListener.Addr().String())
-	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
-	hb.RegisterHeartbeaterServer(hbServer, hbRouter)
-	go func() {
-		hbServer.Serve(heartbeatListener)
-	}()
-	defer hbServer.GracefulStop()
-
-	// create operator to communicate with agent
-	hbOpts := node.NewHeartbeatOptions().
-		SetEnabled(true).
-		SetHeartbeatRouter(hbRouter)
-	nodeOpts := node.NewOptions(iopts).
-		SetHeartbeatOptions(hbOpts).
-		SetOperatorClientFn(testOperatorClientFn(agentListener.Addr().String()))
-	svc := placement.NewInstance()
-	svcNode, err := node.New(svc, nodeOpts)
-	require.NoError(t, err)
-	defer svcNode.Close()
-	// capture notifications from operator
+	// capture notifications
 	var (
 		lock                sync.Mutex
 		notifiedTermination = false
@@ -112,11 +62,16 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 			require.FailNow(t, "received overwrite: %v", s)
 		},
 	)
+
+	svcNode := th.nodeService
+	th.Start()
+	defer th.Close()
+
 	id := svcNode.RegisterListener(eventListener)
 	defer svcNode.DeregisterListener(id)
 
 	// create test build
-	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
+	execScript := th.newTestScript(shortLivedTestProgram)
 	testBuildID := "target-file.sh"
 	testBinary := build.NewServiceBuild(testBuildID, execScript)
 
@@ -126,24 +81,23 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
 	// get the files transferred over
-	err = svcNode.Setup(testBinary, testConfig, "tok", false)
-	require.NoError(t, err)
+	require.NoError(t, svcNode.Setup(testBinary, testConfig, "tok", false))
 
 	// execute the build
 	require.NoError(t, svcNode.Start())
-	stopped := waitUntilAgentFinished(agentService, time.Second)
+	stopped := waitUntilAgentFinished(th.agentService, time.Second)
 	require.True(t, stopped)
 
 	// ensure we were notified of exit at the operator level
 	require.True(t, notifiedTermination)
-	iopts.Logger().Infof("received termination heartbeat in operator")
+	th.logger.Infof("received termination heartbeat in operator")
 
-	stderrFile := path.Join(targetLocation, fmt.Sprintf("%s.err", testBuildID))
+	stderrFile := path.Join(th.workingDir, fmt.Sprintf("%s.err", testBuildID))
 	stderrContents, err := ioutil.ReadFile(stderrFile)
 	require.NoError(t, err)
 	require.Equal(t, []byte{}, stderrContents, string(stderrContents))
 
-	stdoutFile := path.Join(targetLocation, fmt.Sprintf("%s.out", testBuildID))
+	stdoutFile := path.Join(th.workingDir, fmt.Sprintf("%s.out", testBuildID))
 	stdoutContents, err := ioutil.ReadFile(stdoutFile)
 	require.NoError(t, err)
 	require.Equal(t, []byte("testing random output"), stdoutContents)

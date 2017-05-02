@@ -151,3 +151,7 @@ func testOperatorClientFn(endpoint string) node.OperatorClientFn {
 		return conn, m3em.NewOperatorClient(conn), err
 	}
 }
+
+func testExecGenFn(binary string, config string) (string, []string) {
+	return binary, []string{"-f", config}
+}

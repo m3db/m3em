@@ -24,69 +24,39 @@ package integration
 
 import (
 	"io/ioutil"
-	"net"
-	"os"
 	"path"
 	"testing"
 
-	"github.com/m3db/m3cluster/services/placement"
-	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
-	"github.com/m3db/m3em/generated/proto/m3em"
-	"github.com/m3db/m3em/node"
 
-	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 )
 
 func TestFileTransfer(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	targetLocation := newTempDir(t)
-	defer os.RemoveAll(targetLocation)
 
-	iopts := instrument.NewOptions()
-	// create listener, get free port from OS
-	l, _ := net.Listen("tcp", "127.0.0.1:0")
-	defer l.Close()
-
-	// create operator agent
-	aOpts := agent.NewOptions(iopts).SetWorkingDirectory(targetLocation)
-	server := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
-	service, err := agent.New(aOpts)
-	require.NoError(t, err)
-	m3em.RegisterOperatorServer(server, service)
-	go func() {
-		server.Serve(l)
-	}()
-	defer server.GracefulStop()
-
-	// create operator to communicate with agent
-	nodeOpts := node.NewOptions(iopts).
-		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
-	svc := placement.NewInstance()
-	node, err := node.New(svc, nodeOpts)
-	require.NoError(t, err)
-	defer node.Close()
+	th := newTestHarness(t)
 
 	// create test build
 	buildContents := []byte("some long string of text\nthat goes on and on\n")
-	testFile := newTempFile(t, targetLocation, buildContents)
-	defer os.Remove(testFile.Name())
+	testFile := th.newTempFile(buildContents)
 	testBuildID := "target-file.out"
-	targetBuildFile := path.Join(targetLocation, testBuildID)
+	targetBuildFile := path.Join(th.workingDir, testBuildID)
 	testBinary := build.NewServiceBuild(testBuildID, testFile.Name())
 
 	// create test config
 	confContents := []byte("some longer string of text\nthat goes on, on and on\n")
 	testConfigID := "target-file.conf"
-	targetConfigFile := path.Join(targetLocation, testConfigID)
+	targetConfigFile := path.Join(th.workingDir, testConfigID)
 	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
-	err = node.Setup(testBinary, testConfig, "tok", false)
-	require.NoError(t, err)
+	th.Start()
+	defer th.Close()
+	node := th.nodeService
+
+	require.NoError(t, node.Setup(testBinary, testConfig, "tok", false))
 
 	// test copied build file contents
 	obsBytes, err := ioutil.ReadFile(targetBuildFile)
@@ -97,4 +67,6 @@ func TestFileTransfer(t *testing.T) {
 	obsBytes, err = ioutil.ReadFile(targetConfigFile)
 	require.NoError(t, err)
 	require.Equal(t, confContents, obsBytes)
+
+	th.logger.Infof("verified contents")
 }

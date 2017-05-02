@@ -45,7 +45,7 @@ import (
 )
 
 const (
-	defaultReportInterval       = time.Duration(5 * time.Second)
+	defaultReportInterval       = 5 * time.Second
 	defaultHeartbeatConnTimeout = time.Minute
 	defaultTestCanaryPrefix     = "test-canary-file"
 )
@@ -58,19 +58,25 @@ type opAgent struct {
 	sync.RWMutex
 	opts           Options
 	logger         xlog.Logger
-	metrics        *opAgentMetrics
 	running        bool
 	token          string
 	executablePath string
 	configPath     string
 	processMonitor exec.ProcessMonitor
 	heartbeater    *opAgentHeartBeater
+	metrics        *opAgentMetrics
+	doneCh         chan struct{}
+	closeCh        chan struct{}
 }
 
 // New creates and retuns a new Operator Agent
 func New(
 	opts Options,
 ) (Agent, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	if err := canaryWriteTest(opts.WorkingDirectory()); err != nil {
 		return nil, err
 	}
@@ -111,12 +117,19 @@ func updateBoolGauge(b bool, m tally.Gauge) {
 }
 
 func (o *opAgent) reportMetrics() {
+	reportTicker := time.NewTicker(defaultReportInterval)
 	for {
-		running, exec, conf := o.state()
-		updateBoolGauge(running, o.metrics.running)
-		updateBoolGauge(exec != "", o.metrics.execTransferred)
-		updateBoolGauge(conf != "", o.metrics.confTransferred)
-		time.Sleep(defaultReportInterval)
+		select {
+		case <-reportTicker.C:
+			running, exec, conf := o.state()
+			updateBoolGauge(running, o.metrics.running)
+			updateBoolGauge(exec != "", o.metrics.execTransferred)
+			updateBoolGauge(conf != "", o.metrics.confTransferred)
+		case <-o.closeCh:
+			reportTicker.Stop()
+			o.doneCh <- struct{}{}
+			return
+		}
 	}
 }
 
@@ -231,8 +244,8 @@ func (o *opAgent) startWithLock() error {
 			Env:       o.opts.EnvMap(),
 		}
 		listener = o.newProcessListener()
-		pm, err  = exec.NewProcessMonitor(cmd, listener)
 	)
+	pm, err := exec.NewProcessMonitor(cmd, listener)
 	if err != nil {
 		return err
 	}

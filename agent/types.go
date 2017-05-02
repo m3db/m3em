@@ -38,6 +38,9 @@ type Agent interface {
 
 // Options represent the knobs for a m3em agent
 type Options interface {
+	// Validate checks if the options set are valid
+	Validate() error
+
 	// SetInstrumentOptions sets the instrument options
 	SetInstrumentOptions(instrument.Options) Options
 

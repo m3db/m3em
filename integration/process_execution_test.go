@@ -25,56 +25,24 @@ package integration
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
-	"os"
 	"path"
 	"testing"
 	"time"
 
-	"github.com/m3db/m3cluster/services/placement"
-	"github.com/m3db/m3em/agent"
 	"github.com/m3db/m3em/build"
-	"github.com/m3db/m3em/generated/proto/m3em"
-	"github.com/m3db/m3em/node"
 
-	"github.com/m3db/m3x/instrument"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 )
 
 func TestProcessExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	targetLocation := newTempDir(t)
-	defer os.RemoveAll(targetLocation)
 
-	iopts := instrument.NewOptions()
-	// create listener, get free port from OS
-	l, _ := net.Listen("tcp", "127.0.0.1:0")
-	defer l.Close()
-
-	// create operator agent
-	aOpts := agent.NewOptions(iopts).SetWorkingDirectory(targetLocation)
-	server := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
-	agentService, err := agent.New(aOpts)
-	require.NoError(t, err)
-	m3em.RegisterOperatorServer(server, agentService)
-	go func() {
-		server.Serve(l)
-	}()
-	defer server.GracefulStop()
-
-	// create operator to communicate with agent
-	nodeOpts := node.NewOptions(iopts).
-		SetOperatorClientFn(testOperatorClientFn(l.Addr().String()))
-	svc := placement.NewInstance()
-	node, err := node.New(svc, nodeOpts)
-	require.NoError(t, err)
-	defer node.Close()
+	th := newTestHarness(t)
 
 	// create test build
-	execScript := newTestScript(t, targetLocation, 0, shortLivedTestProgram)
+	execScript := th.newTestScript(shortLivedTestProgram)
 	testBuildID := "target-file.sh"
 	testBinary := build.NewServiceBuild(testBuildID, execScript)
 
@@ -83,21 +51,24 @@ func TestProcessExecution(t *testing.T) {
 	testConfigID := "target-file.conf"
 	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
+	node := th.nodeService
+	th.Start()
+	defer th.Close()
+
 	// get the files transferred over
-	err = node.Setup(testBinary, testConfig, "tok", false)
-	require.NoError(t, err)
+	require.NoError(t, node.Setup(testBinary, testConfig, "tok", false))
 
 	// execute the build
 	require.NoError(t, node.Start())
-	stopped := waitUntilAgentFinished(agentService, time.Second)
+	stopped := waitUntilAgentFinished(th.agentService, time.Second)
 	require.True(t, stopped)
 
-	stderrFile := path.Join(targetLocation, fmt.Sprintf("%s.err", testBuildID))
+	stderrFile := path.Join(th.workingDir, fmt.Sprintf("%s.err", testBuildID))
 	stderrContents, err := ioutil.ReadFile(stderrFile)
 	require.NoError(t, err)
 	require.Equal(t, []byte{}, stderrContents, string(stderrContents))
 
-	stdoutFile := path.Join(targetLocation, fmt.Sprintf("%s.out", testBuildID))
+	stdoutFile := path.Join(th.workingDir, fmt.Sprintf("%s.out", testBuildID))
 	stdoutContents, err := ioutil.ReadFile(stdoutFile)
 	require.NoError(t, err)
 	require.Equal(t, []byte("testing random output"), stdoutContents)

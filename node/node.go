@@ -275,8 +275,8 @@ func (i *svcNode) Close() error {
 	var err xerrors.MultiError
 
 	if conn := i.clientConn; conn != nil {
-		i.clientConn = nil
 		err = err.Add(conn.Close())
+		i.clientConn = nil
 	}
 
 	if hbServer := i.heartbeater; hbServer != nil {
