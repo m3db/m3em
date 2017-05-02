@@ -100,33 +100,10 @@ func (c *svcCluster) addSparesWithLock(spares []node.ServiceNode) {
 	}
 }
 
-func (c *svcCluster) removeFromSparesWithLock(nodes []node.ServiceNode) error {
-	var multiErr xerrors.MultiError
-
-	// ensure all provided nodes are actually spares
-	for _, n := range nodes {
-		if _, ok := c.sparesByID[n.ID()]; !ok {
-			multiErr = multiErr.Add(fmt.Errorf("unable to remove node: %+v from spares", n))
-		}
-	}
-	if err := multiErr.FinalError(); err != nil {
-		return err
-	}
-
-	ids := make(map[string]struct{}, len(nodes))
-	for _, n := range nodes {
-		delete(c.sparesByID, n.ID())
-		ids[n.ID()] = struct{}{}
-	}
-
-	c.spares = nodeSliceWithoutSpecifiedIDs(c.spares, ids)
-	return nil
-}
-
-func nodeSliceWithoutSpecifiedIDs(originalSlice node.ServiceNodes, removeIDs map[string]struct{}) node.ServiceNodes {
+func nodeSliceWithoutID(originalSlice node.ServiceNodes, removeID string) node.ServiceNodes {
 	newSlice := make(node.ServiceNodes, 0, len(originalSlice))
 	for _, elem := range originalSlice {
-		if _, ok := removeIDs[elem.ID()]; !ok {
+		if elem.ID() != removeID {
 			newSlice = append(newSlice, elem)
 		}
 	}
@@ -259,7 +236,6 @@ func (c *svcCluster) Setup(numNodes int) ([]node.ServiceNode, error) {
 	}
 
 	multiErr = multiErr.
-		Add(c.removeFromSparesWithLock(setupNodes)).
 		Add(c.setPlacementWithLock(placement))
 
 	return setupNodes, c.markStatusWithLock(ClusterStatusSetup, multiErr.FinalError())
@@ -272,6 +248,8 @@ func (c *svcCluster) markSpareUsedWithLock(spare services.PlacementInstance) (no
 		// should never happen
 		return nil, fmt.Errorf("unable to find spare node with id: %s", id)
 	}
+	delete(c.sparesByID, id)
+	c.spares = nodeSliceWithoutID(c.spares, id)
 	c.usedNodes[id] = spareNode
 	return spareNode, nil
 }
@@ -297,10 +275,6 @@ func (c *svcCluster) AddNode() (node.ServiceNode, error) {
 
 	setupNode, err := c.markSpareUsedWithLock(usedInstance)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := c.removeFromSparesWithLock([]node.ServiceNode{setupNode}); err != nil {
 		return nil, err
 	}
 
@@ -394,7 +368,6 @@ func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) ([]node.ServiceNode, 
 	}
 
 	multiErr = multiErr.
-		Add(c.removeFromSparesWithLock(newNodes)).
 		Add(c.setPlacementWithLock(newPlacement))
 
 	return newNodes, nil
