@@ -33,8 +33,9 @@ import (
 	m3emconfig "github.com/m3db/m3em/services/m3em_agent/config"
 	"github.com/m3db/m3em/tcp"
 
+	"github.com/m3db/m3x/config"
 	"github.com/m3db/m3x/instrument"
-	xlog "github.com/m3db/m3x/log"
+	"github.com/m3db/m3x/log"
 	"github.com/pborman/getopt"
 	"github.com/uber-go/tally"
 	"google.golang.org/grpc"
@@ -52,7 +53,9 @@ func Run() {
 	}
 
 	logger := xlog.NewLogger(os.Stdout)
-	conf, err := m3emconfig.New(*configFile)
+
+	var conf m3emconfig.Configuration
+	err := xconfig.LoadFile(conf, *configFile)
 	if err != nil {
 		logger.Fatalf("unable to read configuration file: %v", err.Error())
 	}

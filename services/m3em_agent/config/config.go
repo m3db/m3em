@@ -21,9 +21,7 @@
 package agentmain
 
 import (
-	"github.com/spf13/viper"
 	tallym3 "github.com/uber-go/tally/m3"
-	validator "gopkg.in/validator.v2"
 )
 
 // Configuration is a collection of knobs to configure m3em_agent processes
@@ -58,26 +56,4 @@ type MetricsConfiguration struct {
 type ServerConfiguration struct {
 	ListenAddress string `yaml:"listenAddress" validate:"nonzero"`
 	DebugAddress  string `yaml:"debugAddress"  validate:"nonzero"`
-}
-
-// New returns a new Configuration object read from the specified yaml file
-func New(filename string) (Configuration, error) {
-	viper.SetConfigType("yaml")
-	viper.SetConfigFile(filename)
-
-	var conf Configuration
-
-	if err := viper.ReadInConfig(); err != nil {
-		return conf, err
-	}
-
-	if err := viper.Unmarshal(&conf); err != nil {
-		return conf, err
-	}
-
-	if err := validator.Validate(conf); err != nil {
-		return conf, err
-	}
-
-	return conf, nil
 }
