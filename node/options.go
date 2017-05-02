@@ -36,7 +36,6 @@ var (
 
 type nodeOpts struct {
 	iopts              instrument.Options
-	connectionTimeout  time.Duration
 	operationTimeout   time.Duration
 	transferBufferSize int
 	retrier            xretry.Retrier
