@@ -20,6 +20,19 @@
 
 package exec
 
+import (
+	"fmt"
+)
+
+var (
+	// ErrPathNotSet indicates a Cmd object which doesn't have a path value
+	ErrPathNotSet = fmt.Errorf("cmd: no path specified")
+
+	// ErrArgsRequiresPathAsFirstArg indicates a Cmd object which doesn't have
+	// args[0] == path
+	ErrArgsRequiresPathAsFirstArg = fmt.Errorf("cmd: args[0] un-equal to path")
+)
+
 // EnvMap is a map of Key-Value pairs representing the environment variables.
 // NB(prateek): these are a set of 'delta' vars, i.e. they are appended to the
 // vars already present in `os.Environ()`.
@@ -35,6 +48,17 @@ type Cmd struct {
 	Args      []string
 	OutputDir string
 	Env       EnvMap
+}
+
+// Validate ensures the provide Cmd object conforms to the expected structure.
+func (c Cmd) Validate() error {
+	if c.Path == "" {
+		return ErrPathNotSet
+	}
+	if len(c.Args) > 0 && c.Path != c.Args[0] {
+		return ErrArgsRequiresPathAsFirstArg
+	}
+	return nil
 }
 
 // ProcessListener permits users of the API to be notified of process termination

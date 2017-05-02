@@ -24,10 +24,10 @@ package m3em;
 
 service Operator {
   rpc Setup(SetupRequest)              returns (SetupResponse);
-	rpc Transfer(stream TransferRequest) returns (TransferResponse);
-	rpc Start(StartRequest)              returns (StartResponse);
-	rpc Stop(StopRequest)                returns (StopResponse);
-	rpc Teardown(TeardownRequest)        returns (TeardownResponse);
+  rpc Transfer(stream TransferRequest) returns (TransferResponse);
+  rpc Start(StartRequest)              returns (StartResponse);
+  rpc Stop(StopRequest)                returns (StopResponse);
+  rpc Teardown(TeardownRequest)        returns (TeardownResponse);
 }
 
 enum FileType {

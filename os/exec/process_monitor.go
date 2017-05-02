@@ -40,24 +40,12 @@ var (
 )
 
 var (
-	errUnableToStartClosed        = fmt.Errorf("unable to start: process monitor Closed()")
-	errUnableToStartRunning       = fmt.Errorf("unable to start: process already running")
-	errUnableToStopClosed         = fmt.Errorf("unable to stop: process monitor Closed()")
-	errUnableToStopStoped         = fmt.Errorf("unable to stop: process not running")
-	errUnableToClose              = fmt.Errorf("unable to close: process monitor already Closed()")
-	errPathNotSet                 = fmt.Errorf("cmd: no path specified")
-	errArgsRequiresPathAsFirstArg = fmt.Errorf("cmd: args[0] un-equal to path")
+	errUnableToStartClosed  = fmt.Errorf("unable to start: process monitor Closed()")
+	errUnableToStartRunning = fmt.Errorf("unable to start: process already running")
+	errUnableToStopClosed   = fmt.Errorf("unable to stop: process monitor Closed()")
+	errUnableToStopStoped   = fmt.Errorf("unable to stop: process not running")
+	errUnableToClose        = fmt.Errorf("unable to close: process monitor already Closed()")
 )
-
-func (c Cmd) validate() error {
-	if c.Path == "" {
-		return errPathNotSet
-	}
-	if len(c.Args) > 0 && c.Path != c.Args[0] {
-		return errArgsRequiresPathAsFirstArg
-	}
-	return nil
-}
 
 func (m EnvMap) toSlice() []string {
 	if m == nil || len(m) == 0 {
@@ -71,29 +59,29 @@ func (m EnvMap) toSlice() []string {
 }
 
 type processListener struct {
-	complete func()
-	err      func(error)
+	completeFn func()
+	errFn      func(error)
 }
 
 // NewProcessListener returns a new ProcessListener
 func NewProcessListener(
-	complete func(),
-	err func(error),
+	completeFn func(),
+	errFn func(error),
 ) ProcessListener {
 	return &processListener{
-		complete: complete,
-		err:      err,
+		completeFn: completeFn,
+		errFn:      errFn,
 	}
 }
 
 func (pl *processListener) OnComplete() {
-	if fn := pl.complete; fn != nil {
+	if fn := pl.completeFn; fn != nil {
 		fn()
 	}
 }
 
 func (pl *processListener) OnError(err error) {
-	if fn := pl.err; fn != nil {
+	if fn := pl.errFn; fn != nil {
 		fn(err)
 	}
 }
@@ -115,7 +103,7 @@ type processMonitor struct {
 
 // NewProcessMonitor creates a new ProcessMonitor
 func NewProcessMonitor(cmd Cmd, pl ProcessListener) (ProcessMonitor, error) {
-	if err := cmd.validate(); err != nil {
+	if err := cmd.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -202,19 +190,12 @@ func (pm *processMonitor) startSync() {
 	pm.running = true
 	pm.Unlock()
 
-	if err := pm.cmd.Run(); err != nil {
-		pm.Lock()
-		pm.err = err
-		pm.running = false
-		pm.Unlock()
-		pm.notifyListener(err)
-		return
-	}
-
+	err := pm.cmd.Run()
 	pm.Lock()
+	pm.err = err
 	pm.running = false
 	pm.Unlock()
-	pm.notifyListener(nil)
+	pm.notifyListener(err)
 }
 
 func (pm *processMonitor) Stop() error {
