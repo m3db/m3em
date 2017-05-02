@@ -536,19 +536,14 @@ func (h *opAgentHeartBeater) heartbeatLoop(d time.Duration) {
 
 	// explicitly send first heartbeat as soon as we start
 	h.sendHealthyHeartbeat()
-
-	var (
-		timer     = time.NewTimer(d)
-		heartbeat = true
-	)
+	timer := time.NewTimer(d)
 	defer timer.Stop()
 
-	for heartbeat {
+	for {
 		select {
 		case msg := <-h.msgChan:
 			if msg.stop {
-				heartbeat = false
-				continue
+				return
 			}
 			beat := h.defaultHeartbeat()
 			msg.toRPCType(&beat)
