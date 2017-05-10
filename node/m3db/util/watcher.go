@@ -26,9 +26,8 @@ import (
 	"time"
 
 	m3dbnode "github.com/m3db/m3em/node/m3db"
-	mtime "github.com/m3db/m3em/time"
 
-	xerrors "github.com/m3db/m3x/errors"
+	"github.com/m3db/m3x/errors"
 )
 
 type nodesWatcher struct {
@@ -88,7 +87,7 @@ func (nw *nodesWatcher) WaitUntil(p M3DBNodePredicate, timeout time.Duration) bo
 		m3dbNode := nw.pending[id]
 		go func(m3dbNode m3dbnode.Node) {
 			defer wg.Done()
-			if cond := mtime.WaitUntil(func() bool { return p(m3dbNode) }, timeout); cond {
+			if cond := xclock.WaitUntil(func() bool { return p(m3dbNode) }, timeout); cond {
 				nw.removeInstanceWithLock(m3dbNode.ID())
 			}
 		}(m3dbNode)

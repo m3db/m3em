@@ -27,9 +27,9 @@ import (
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/generated/proto/m3em"
-	mtime "github.com/m3db/m3em/time"
 
 	"github.com/m3db/m3cluster/services"
+	xclock "github.com/m3db/m3x/clock"
 	xerrors "github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 	gu "github.com/nu7hatch/gouuid"
@@ -156,7 +156,7 @@ func (i *svcNode) Setup(
 	// Wait till we receive our first heartbeat
 	if i.opts.HeartbeatOptions().Enabled() {
 		i.logger.Infof("waiting until initial heartbeat is recieved")
-		received := mtime.WaitUntil(i.heartbeatReceived, i.opts.HeartbeatOptions().Timeout())
+		received := xclock.WaitUntil(i.heartbeatReceived, i.opts.HeartbeatOptions().Timeout())
 		if !received {
 			return fmt.Errorf("did not receive heartbeat response from remote agent within timeout")
 		}

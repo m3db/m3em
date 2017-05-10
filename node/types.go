@@ -26,11 +26,11 @@ import (
 	"github.com/m3db/m3em/build"
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
-	mtime "github.com/m3db/m3em/time"
 
 	"github.com/m3db/m3cluster/services"
+	xclock "github.com/m3db/m3x/clock"
 	"github.com/m3db/m3x/instrument"
-	xretry "github.com/m3db/m3x/retry"
+	"github.com/m3db/m3x/retry"
 	"google.golang.org/grpc"
 )
 
@@ -210,10 +210,10 @@ type HeartbeatOptions interface {
 	Enabled() bool
 
 	// SetNowFn sets the NowFn
-	SetNowFn(mtime.NowFn) HeartbeatOptions
+	SetNowFn(xclock.NowFn) HeartbeatOptions
 
 	// NowFn returns the NowFn
-	NowFn() mtime.NowFn
+	NowFn() xclock.NowFn
 
 	// SetInterval sets the heartbeating interval
 	SetInterval(time.Duration) HeartbeatOptions

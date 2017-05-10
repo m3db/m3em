@@ -31,7 +31,6 @@ import (
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 	m3emconfig "github.com/m3db/m3em/services/m3em_agent/config"
-	"github.com/m3db/m3em/tcp"
 
 	"github.com/m3db/m3x/config"
 	"github.com/m3db/m3x/instrument"
@@ -78,7 +77,7 @@ func Run() {
 	}, time.Second)
 	defer scopeCloser.Close()
 
-	listener, err := tcp.NewTCPListener(conf.Server.ListenAddress, 3*time.Minute)
+	listener, err := xtcp.NewTCPListener(conf.Server.ListenAddress, 3*time.Minute)
 	if err != nil {
 		logger.Fatalf("could not create TCP Listener: %v", err)
 	}

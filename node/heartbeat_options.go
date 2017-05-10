@@ -21,10 +21,10 @@
 package node
 
 import (
-	mtime "github.com/m3db/m3em/time"
-
 	"fmt"
 	"time"
+
+	xclock "github.com/m3db/m3x/clock"
 )
 
 const (
@@ -40,7 +40,7 @@ var (
 
 type heartbeatOpts struct {
 	enabled       bool
-	nowFn         mtime.NowFn
+	nowFn         xclock.NowFn
 	interval      time.Duration
 	checkInterval time.Duration
 	timeout       time.Duration
@@ -74,12 +74,12 @@ func (ho *heartbeatOpts) Enabled() bool {
 	return ho.enabled
 }
 
-func (ho *heartbeatOpts) SetNowFn(fn mtime.NowFn) HeartbeatOptions {
+func (ho *heartbeatOpts) SetNowFn(fn xclock.NowFn) HeartbeatOptions {
 	ho.nowFn = fn
 	return ho
 }
 
-func (ho *heartbeatOpts) NowFn() mtime.NowFn {
+func (ho *heartbeatOpts) NowFn() xclock.NowFn {
 	return ho.nowFn
 }
 

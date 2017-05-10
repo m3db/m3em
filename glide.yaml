@@ -15,7 +15,7 @@ import:
   - services
   - shard
 - package: github.com/m3db/m3x
-  version: 1d5e58270a2083a8517e8ebf894feebcaaf4d823
+  version: bd6be18ffb184691512eb442561b16a59c15d797
   subpackages:
   - errors
   - instrument
