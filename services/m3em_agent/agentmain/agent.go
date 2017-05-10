@@ -35,6 +35,7 @@ import (
 	"github.com/m3db/m3x/config"
 	"github.com/m3db/m3x/instrument"
 	"github.com/m3db/m3x/log"
+	xtcp "github.com/m3db/m3x/tcp"
 	"github.com/pborman/getopt"
 	"github.com/uber-go/tally"
 	"google.golang.org/grpc"
