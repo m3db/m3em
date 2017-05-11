@@ -205,7 +205,7 @@ func testHeartbeatOptions() node.HeartbeatOptions {
 		SetEnabled(true).
 		SetTimeout(2 * time.Second).
 		SetCheckInterval(100 * time.Millisecond).
-		SetInterval(200 * time.Millisecond)
+		SetInterval(time.Second)
 }
 
 func (th *testHarness) newNodeOptions(hbOpts node.HeartbeatOptions) node.Options {

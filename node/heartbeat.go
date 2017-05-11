@@ -176,21 +176,24 @@ func (h *opHeartbeatServer) monitorTimeout() {
 		checkInterval      = h.opts.CheckInterval()
 		timeoutInterval    = h.opts.Timeout()
 		nowFn              = h.opts.NowFn()
-		checkTicker        = time.NewTicker(checkInterval)
 		lastNotificationTs time.Time
 	)
 
 	for {
 		select {
 		case <-h.stopChan:
-			checkTicker.Stop()
 			return
-		case <-checkTicker.C:
+		default:
 			last := h.lastHeartbeatTime()
 			if !last.IsZero() && nowFn().Sub(last) > timeoutInterval && lastNotificationTs != last {
 				h.listeners.notifyTimeout(last)
 				lastNotificationTs = last
 			}
+			// NB(prateek): we use a sleep instead of a ticker because the latter
+			// does guarantees a lower bound on the frequency of ticks, no guarantee
+			// is provided for the upper bound. This makes it hard to reliably detect
+			// heartbeating timeouts.
+			time.Sleep(checkInterval)
 		}
 	}
 }
