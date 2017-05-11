@@ -27,6 +27,7 @@ import (
 
 	m3dbnode "github.com/m3db/m3em/node/m3db"
 
+	xclock "github.com/m3db/m3x/clock"
 	"github.com/m3db/m3x/errors"
 )
 
