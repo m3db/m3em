@@ -190,8 +190,8 @@ func (h *opHeartbeatServer) monitorTimeout() {
 				lastNotificationTs = last
 			}
 			// NB(prateek): we use a sleep instead of a ticker because the latter
-			// does guarantees a lower bound on the frequency of ticks, no guarantee
-			// is provided for the upper bound. This makes it hard to reliably detect
+			// only guarantees a lower bound on the frequency of ticks, it does not
+			// guarantee any upper bound. This makes it impossible to reliably detect
 			// heartbeating timeouts.
 			time.Sleep(checkInterval)
 		}
