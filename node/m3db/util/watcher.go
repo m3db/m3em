@@ -79,7 +79,7 @@ func (nw *nodesWatcher) PendingAsError() error {
 	return multiErr.FinalError()
 }
 
-func (nw *nodesWatcher) WaitUntil(p M3DBNodePredicate, timeout time.Duration) bool {
+func (nw *nodesWatcher) WaitUntilAll(p M3DBNodePredicate, timeout time.Duration) bool {
 	nw.Lock()
 	defer nw.Unlock()
 	var wg sync.WaitGroup
@@ -95,4 +95,26 @@ func (nw *nodesWatcher) WaitUntil(p M3DBNodePredicate, timeout time.Duration) bo
 	}
 	wg.Wait()
 	return len(nw.pending) == 0
+}
+
+func (nw *nodesWatcher) WaitUntilAny(p M3DBNodePredicate, timeout time.Duration) bool {
+	nw.Lock()
+	defer nw.Unlock()
+	anyCh := make(chan struct{})
+	for id := range nw.pending {
+		m3dbNode := nw.pending[id]
+		go func(m3dbNode m3dbnode.Node) {
+			if cond := xclock.WaitUntil(func() bool { return p(m3dbNode) }, timeout); cond {
+				nw.removeInstanceWithLock(m3dbNode.ID())
+				anyCh <- struct{}{}
+			}
+		}(m3dbNode)
+	}
+	select {
+	case <-anyCh:
+		return true
+
+	case <-time.After(timeout):
+		return false
+	}
 }
