@@ -294,6 +294,12 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	defer o.Unlock()
 
 	var multiErr xerrors.MultiError
+
+	o.logger.Infof("stopping heartbeating")
+	if o.heartbeater != nil {
+		multiErr = multiErr.Add(o.heartbeater.close())
+	}
+
 	if o.processMonitor != nil {
 		o.logger.Infof("processMonitor exists, attempting to Close()")
 		if err := o.processMonitor.Close(); err != nil {
@@ -314,11 +320,6 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	if err := o.opts.ReleaseHostResourcesFn()(); err != nil {
 		o.logger.Infof("unable to release host resources: %v", err)
 		multiErr = multiErr.Add(err)
-	}
-
-	o.logger.Infof("stopping heartbeating")
-	if o.heartbeater != nil {
-		multiErr = multiErr.Add(o.heartbeater.close())
 	}
 
 	o.token = ""
