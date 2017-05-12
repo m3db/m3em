@@ -21,6 +21,9 @@
 package agentmain
 
 import (
+	// pprof import
+	_ "net/http/pprof"
+
 	"net/http"
 	"os"
 	oexec "os/exec"
