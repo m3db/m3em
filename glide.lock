@@ -1,5 +1,5 @@
 hash: ff87c86017626849a6adf52c3d36a6cb944430dfe79eaa14e44b8d74f07a3feb
-updated: 2017-05-10T17:38:04.486979883-04:00
+updated: 2017-05-12T12:30:26.321304275-04:00
 imports:
 - name: github.com/apache/thrift
   version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
@@ -38,6 +38,7 @@ imports:
 - name: github.com/m3db/m3x
   version: bd6be18ffb184691512eb442561b16a59c15d797
   subpackages:
+  - clock
   - close
   - config
   - errors
@@ -46,7 +47,7 @@ imports:
   - process
   - retry
   - sync
-  - time
+  - tcp
   - watch
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
