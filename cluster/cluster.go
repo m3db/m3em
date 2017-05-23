@@ -27,6 +27,7 @@ import (
 	"github.com/m3db/m3em/node"
 
 	"github.com/m3db/m3cluster/services"
+	"github.com/m3db/m3cluster/shard"
 	"github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
 	"github.com/m3db/m3x/sync"
@@ -325,7 +326,7 @@ func (c *svcCluster) RemoveNode(i node.ServiceNode) error {
 
 	// update removed instance from used -> spare
 	// nb(prateek): this omits modeling "leaving" shards on the node being removed
-	usedNode.SetShards(nil)
+	usedNode.SetShards(shard.NewShards(nil))
 	delete(c.usedNodes, usedNode.ID())
 	c.addSparesWithLock([]node.ServiceNode{usedNode})
 
@@ -352,7 +353,7 @@ func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) ([]node.ServiceNode, 
 	}
 
 	// mark old node no longer used
-	oldNode.SetShards(nil)
+	oldNode.SetShards(shard.NewShards(nil))
 	delete(c.usedNodes, oldNode.ID())
 	c.addSparesWithLock([]node.ServiceNode{oldNode})
 
@@ -428,7 +429,7 @@ func (c *svcCluster) Teardown() error {
 	executor.run()
 
 	for id, usedNode := range c.usedNodes {
-		usedNode.SetShards(nil)
+		usedNode.SetShards(shard.NewShards(nil))
 		delete(c.usedNodes, id)
 	}
 	c.spares = make([]node.ServiceNode, 0, len(c.knownNodes))
