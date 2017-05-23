@@ -284,12 +284,12 @@ func (c *svcCluster) AddNode() (node.ServiceNode, error) {
 
 func (c *svcCluster) setPlacementWithLock(p services.ServicePlacement) error {
 	for _, instance := range p.Instances() {
+		// nb(prateek): update usedNodes with the new shards.
 		instanceID := instance.ID()
 		usedNode, ok := c.usedNodes[instanceID]
-		if !ok {
-			return fmt.Errorf("unable to set placement, instance %+v is not marked as used", instance)
+		if ok {
+			usedNode.SetShards(instance.Shards())
 		}
-		usedNode.SetShards(instance.Shards())
 	}
 
 	c.placement = p
@@ -324,6 +324,7 @@ func (c *svcCluster) RemoveNode(i node.ServiceNode) error {
 	}
 
 	// update removed instance from used -> spare
+	// nb(prateek): this omits modeling "leaving" shards on the node being removed
 	usedNode.SetShards(nil)
 	delete(c.usedNodes, usedNode.ID())
 	c.addSparesWithLock([]node.ServiceNode{usedNode})
