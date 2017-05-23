@@ -205,17 +205,18 @@ func (c *svcCluster) Setup(numNodes int) ([]node.ServiceNode, error) {
 		return nil, errClusterNotUnitialized
 	}
 
-	if err := c.initWithLock(); err != nil {
-		return nil, err
-	}
-
 	numSpares := len(c.spares)
 	if numSpares < numNodes {
 		return nil, errInsufficientCapacity
 	}
 
+	if err := c.initWithLock(); err != nil {
+		return nil, err
+	}
+
 	psvc := c.placementSvc
-	placement, err := psvc.BuildInitialPlacement(c.sparesAsPlacementInstaceWithLock(), c.opts.NumShards(), c.opts.Replication())
+	spares := c.sparesAsPlacementInstaceWithLock()[:numNodes]
+	placement, err := psvc.BuildInitialPlacement(spares, c.opts.NumShards(), c.opts.Replication())
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +345,8 @@ func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) ([]node.ServiceNode, 
 	}
 
 	psvc := c.placementSvc
-	newPlacement, newInstances, err := psvc.ReplaceInstance(oldNode.ID(), c.sparesAsPlacementInstaceWithLock())
+	spareCandidates := c.sparesAsPlacementInstaceWithLock()
+	newPlacement, newInstances, err := psvc.ReplaceInstance(oldNode.ID(), spareCandidates)
 	if err != nil {
 		return nil, err
 	}
