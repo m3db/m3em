@@ -349,6 +349,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 	// stop existing heartbeating if any
 	if o.heartbeater != nil {
 		o.heartbeater.notifyOverwrite(fmt.Errorf("heartbeating being overwritten by new setup request: %+v", *request))
+		o.heartbeater.close()
 		o.heartbeater = nil
 	}
 
