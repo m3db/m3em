@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/m3db/m3cluster/services"
+	"github.com/m3db/m3cluster/shard"
 	"github.com/stretchr/testify/require"
 )
 
@@ -339,7 +340,7 @@ func TestClusterSetupToRemoveNode(t *testing.T) {
 	require.Equal(t, 1, len(setupNodes))
 	require.Equal(t, mockNode.ID(), setupNodes[0].ID())
 
-	mockNode.EXPECT().SetShards(nil)
+	mockNode.EXPECT().SetShards(shard.NewShards(nil))
 	mockPlacement = services.NewMockServicePlacement(ctrl)
 	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{}).AnyTimes()
 	mpsvc.EXPECT().RemoveInstance(setupNodes[0].ID()).Return(mockPlacement, nil)
@@ -398,7 +399,7 @@ func TestClusterSetupToReplaceNode(t *testing.T) {
 	require.Equal(t, mockNode.ID(), setupNodes[0].ID())
 
 	// create new mock placement for replace
-	mockNode.EXPECT().SetShards(nil)
+	mockNode.EXPECT().SetShards(shard.NewShards(nil))
 	mockPlacement = services.NewMockServicePlacement(ctrl)
 	replacementInstances := []services.PlacementInstance{
 		nodes[1].(services.PlacementInstance),
