@@ -278,8 +278,7 @@ func (c *svcCluster) AddNode() (node.ServiceNode, error) {
 		return nil, err
 	}
 
-	c.setPlacementWithLock(newPlacement)
-	return setupNode, nil
+	return setupNode, c.setPlacementWithLock(newPlacement)
 }
 
 func (c *svcCluster) setPlacementWithLock(p services.ServicePlacement) error {
@@ -371,7 +370,7 @@ func (c *svcCluster) ReplaceNode(oldNode node.ServiceNode) ([]node.ServiceNode, 
 	multiErr = multiErr.
 		Add(c.setPlacementWithLock(newPlacement))
 
-	return newNodes, nil
+	return newNodes, multiErr.FinalError()
 }
 
 func (c *svcCluster) SpareNodes() []node.ServiceNode {
