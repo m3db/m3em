@@ -192,23 +192,24 @@ func (pm *processMonitor) startSync() {
 
 	err := pm.cmd.Run()
 	pm.Lock()
-	pm.err = err
+	defer pm.Unlock()
+
+	// only notify when Stop() has not been called explicitly
+	if done := pm.done; !done {
+		pm.notifyListener(err)
+		pm.err = err
+	}
 	pm.running = false
-	pm.Unlock()
-	pm.notifyListener(err)
 }
 
 func (pm *processMonitor) Stop() error {
 	pm.Lock()
 	defer pm.Unlock()
+	pm.done = true
 	return pm.stopWithLock()
 }
 
 func (pm *processMonitor) stopWithLock() error {
-	if pm.done {
-		return errUnableToStopClosed
-	}
-
 	if pm.err != nil {
 		return pm.err
 	}
@@ -237,7 +238,7 @@ func (pm *processMonitor) Close() error {
 	pm.Lock()
 	defer pm.Unlock()
 	if pm.done {
-		return errUnableToClose
+		return nil
 	}
 
 	var multiErr xerrors.MultiError

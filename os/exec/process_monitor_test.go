@@ -281,8 +281,12 @@ func TestStop(t *testing.T) {
 		Args:      []string{},
 		OutputDir: tempDir,
 	}
+	tl := NewProcessListener(
+		func() { require.FailNow(t, "unexpected OnComplete notification") },
+		func(err error) { require.FailNow(t, "unexpected error: %s", err.Error()) },
+	)
 
-	pm, err := NewProcessMonitor(cmd, nil)
+	pm, err := NewProcessMonitor(cmd, tl)
 	require.NoError(t, err)
 	require.NoError(t, pm.Start())
 
@@ -299,6 +303,9 @@ func TestStop(t *testing.T) {
 	// now crash the program
 	err = pm.Stop()
 	require.NoError(t, err)
+
+	// give bg routines a chance to finish
+	time.Sleep(time.Millisecond)
 	require.NoError(t, pm.Err())
 
 	expectedStdoutFile := path.Join(tempDir, fmt.Sprintf("%s.%s", basePath, defaultStdoutSuffix))
