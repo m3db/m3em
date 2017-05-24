@@ -79,9 +79,14 @@ type Cluster interface {
 	// Teardown releases the resources acquired during Setup().
 	Teardown() error
 
-	// AddNode adds the specified node to the service placement. It does
-	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
+	// AddNode adds a node to the service placement. The node to add is chosen from
+	// amongst // available spares, by the placementservice. It does NOT alter the
+	// state of the ServiceNode (i.e. does not start/stop it).
 	AddNode() (node.ServiceNode, error)
+
+	// AddSpecifiedNode adds the specified node to the service placement. It does
+	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).
+	AddSpecifiedNode(node.ServiceNode) error
 
 	// RemoveNode removes the specified node from the service placement. It does
 	// NOT alter the state of the ServiceNode (i.e. does not start/stop it).

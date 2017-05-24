@@ -256,21 +256,30 @@ func (c *svcCluster) markSpareUsedWithLock(spare services.PlacementInstance) (no
 	return spareNode, nil
 }
 
-func (c *svcCluster) AddNode() (node.ServiceNode, error) {
+func (c *svcCluster) AddSpecifiedNode(newNode node.ServiceNode) error {
 	c.Lock()
 	defer c.Unlock()
 
+	if !c.isSpareNodeWithLock(newNode) {
+		return fmt.Errorf("provided node is not a known spare")
+	}
+
+	_, err := c.addNodeFromListWithLock([]services.PlacementInstance{newNode.(services.PlacementInstance)})
+	return err
+}
+
+func (c *svcCluster) isSpareNodeWithLock(n node.ServiceNode) bool {
+	_, ok := c.sparesByID[n.ID()]
+	return ok
+}
+
+func (c *svcCluster) addNodeFromListWithLock(candidates []services.PlacementInstance) (node.ServiceNode, error) {
 	if c.status != ClusterStatusRunning && c.status != ClusterStatusSetup {
 		return nil, errClusterUnableToAlterPlacement
 	}
 
-	numSpares := len(c.spares)
-	if numSpares < 1 {
-		return nil, errInsufficientCapacity
-	}
-
 	psvc := c.placementSvc
-	newPlacement, usedInstance, err := psvc.AddInstance(c.sparesAsPlacementInstaceWithLock())
+	newPlacement, usedInstance, err := psvc.AddInstance(candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -281,6 +290,18 @@ func (c *svcCluster) AddNode() (node.ServiceNode, error) {
 	}
 
 	return setupNode, c.setPlacementWithLock(newPlacement)
+}
+
+func (c *svcCluster) AddNode() (node.ServiceNode, error) {
+	c.Lock()
+	defer c.Unlock()
+
+	numSpares := len(c.spares)
+	if numSpares < 1 {
+		return nil, errInsufficientCapacity
+	}
+
+	return c.addNodeFromListWithLock(c.sparesAsPlacementInstaceWithLock())
 }
 
 func (c *svcCluster) setPlacementWithLock(p services.ServicePlacement) error {
