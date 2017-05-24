@@ -88,7 +88,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	stopped := waitUntilAgentFinished(th.agentService, time.Second)
 	require.True(t, stopped)
 
-	// ensure we were notified of exit at the operator level
+	// ensure we were notified of exit
 	require.True(t, notifiedTermination)
 	th.logger.Infof("received termination heartbeat in operator")
 

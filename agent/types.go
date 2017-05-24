@@ -21,6 +21,8 @@
 package agent
 
 import (
+	"io"
+
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 
@@ -29,6 +31,7 @@ import (
 
 // Agent is the remote executor of m3em operations
 type Agent interface {
+	io.Closer
 	m3em.OperatorServer
 
 	// Running returns a flag indicating if the test process supervised

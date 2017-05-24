@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
@@ -56,18 +57,23 @@ var (
 
 type opAgent struct {
 	sync.RWMutex
-	opts           Options
-	logger         xlog.Logger
-	running        bool
-	token          string
-	executablePath string
-	configPath     string
-	processMonitor exec.ProcessMonitor
-	heartbeater    *opAgentHeartBeater
-	metrics        *opAgentMetrics
-	doneCh         chan struct{}
-	closeCh        chan struct{}
+	token               string
+	executablePath      string
+	configPath          string
+	newProcessMonitorFn newProcessMonitorFn
+	processMonitor      exec.ProcessMonitor
+
+	opts        Options
+	logger      xlog.Logger
+	running     int32
+	stopping    int32
+	heartbeater *opAgentHeartBeater
+	metrics     *opAgentMetrics
+	doneCh      chan struct{}
+	closeCh     chan struct{}
 }
+
+type newProcessMonitorFn func(exec.Cmd, exec.ProcessListener) (exec.ProcessMonitor, error)
 
 // New creates and retuns a new Operator Agent
 func New(
@@ -82,12 +88,19 @@ func New(
 	}
 
 	agent := &opAgent{
-		opts:    opts,
-		logger:  opts.InstrumentOptions().Logger(),
-		metrics: newAgentMetrics(opts.InstrumentOptions().MetricsScope()),
+		opts:                opts,
+		logger:              opts.InstrumentOptions().Logger(),
+		metrics:             newAgentMetrics(opts.InstrumentOptions().MetricsScope()),
+		newProcessMonitorFn: exec.NewProcessMonitor,
 	}
-	go agent.reportMetrics() // TODO(prateek): don't leak this
+	go agent.reportMetrics()
 	return agent, nil
+}
+
+func (o *opAgent) Close() error {
+	o.closeCh <- struct{}{}
+	<-o.doneCh
+	return nil
 }
 
 func canaryWriteTest(dir string) error {
@@ -134,15 +147,13 @@ func (o *opAgent) reportMetrics() {
 }
 
 func (o *opAgent) Running() bool {
-	o.RLock()
-	defer o.RUnlock()
-	return o.running
+	return atomic.LoadInt32(&o.running) == 1
 }
 
 func (o *opAgent) state() (bool, string, string) {
 	o.RLock()
 	defer o.RUnlock()
-	return o.running, o.executablePath, o.configPath
+	return o.Running(), o.executablePath, o.configPath
 }
 
 func (o *opAgent) initFile(
@@ -188,7 +199,7 @@ func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.
 	o.Lock()
 	defer o.Unlock()
 
-	if o.running {
+	if o.Running() {
 		return nil, grpc.Errorf(codes.FailedPrecondition, "already running")
 	}
 
@@ -214,13 +225,11 @@ func (o *opAgent) newListenerFn() func(error) {
 		} else {
 			err = fmt.Errorf("test process terminated with error: %v", err)
 		}
-		o.Lock()
-		defer o.Unlock()
 		o.logger.Warnf("%v", err)
-		o.running = false
-		if o.heartbeater != nil {
+		if stopping := atomic.LoadInt32(&o.stopping); stopping == 0 && o.heartbeater != nil {
 			o.heartbeater.notifyProcessTermination(err)
 		}
+		atomic.StoreInt32(&o.running, 0)
 	}
 }
 
@@ -245,7 +254,7 @@ func (o *opAgent) startWithLock() error {
 		}
 		listener = o.newProcessListener()
 	)
-	pm, err := exec.NewProcessMonitor(cmd, listener)
+	pm, err := o.newProcessMonitorFn(cmd, listener)
 	if err != nil {
 		return err
 	}
@@ -253,7 +262,7 @@ func (o *opAgent) startWithLock() error {
 	if err := pm.Start(); err != nil {
 		return err
 	}
-	o.running = true
+	atomic.StoreInt32(&o.running, 1)
 	o.processMonitor = pm
 	return nil
 }
@@ -263,13 +272,15 @@ func (o *opAgent) Stop(ctx context.Context, request *m3em.StopRequest) (*m3em.St
 	o.Lock()
 	defer o.Unlock()
 
-	if !o.running {
+	if !o.Running() {
 		return nil, grpc.Errorf(codes.FailedPrecondition, "not running")
 	}
 
+	atomic.StoreInt32(&o.stopping, 1)
 	if err := o.stopWithLock(); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "unable to stop: %v", err)
 	}
+	atomic.StoreInt32(&o.stopping, 0)
 
 	return &m3em.StopResponse{}, nil
 }
@@ -284,7 +295,7 @@ func (o *opAgent) stopWithLock() error {
 	}
 
 	o.processMonitor = nil
-	o.running = false
+	atomic.StoreInt32(&o.running, 0)
 	return nil
 }
 
@@ -307,7 +318,6 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 			multiErr = multiErr.Add(err)
 		}
 		o.processMonitor = nil
-		o.running = false
 	}
 
 	// remove any temporary resources stored in the working directory
@@ -325,8 +335,8 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	o.token = ""
 	o.executablePath = ""
 	o.configPath = ""
-	o.running = false
 	o.heartbeater = nil
+	atomic.StoreInt32(&o.running, 0)
 
 	if finalErr := multiErr.FinalError(); finalErr != nil {
 		return nil, grpc.Errorf(codes.Internal, "unable to teardown: %v", finalErr)
@@ -353,7 +363,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 		o.heartbeater = nil
 	}
 
-	if o.running {
+	if o.Running() {
 		if err := o.stopWithLock(); err != nil {
 			return nil, grpc.Errorf(codes.Aborted, "unable to stop existing process: %v", err)
 		}
