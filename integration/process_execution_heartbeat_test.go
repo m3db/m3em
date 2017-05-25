@@ -85,7 +85,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 
 	// execute the build
 	require.NoError(t, svcNode.Start())
-	stopped := waitUntilAgentFinished(th.agentService, time.Second)
+	stopped := waitUntilAgentFinished(th.agentService, 5*time.Second)
 	require.True(t, stopped)
 
 	// ensure we were notified of exit
