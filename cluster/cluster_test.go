@@ -232,7 +232,10 @@ func TestClusterSetupAddNodeTransition(t *testing.T) {
 	mockNode.EXPECT().SetShards(gomock.Any())
 	mockPlacement := services.NewMockServicePlacement(ctrl)
 	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{pi}).AnyTimes()
-	mpsvc.EXPECT().AddInstance(gomock.Any()).Return(mockPlacement, mockNode, nil)
+	gomock.InOrder(
+		mpsvc.EXPECT().AddInstance(gomock.Any()).Return(nil, nil, fmt.Errorf("faking error to ensure retries")),
+		mpsvc.EXPECT().AddInstance(gomock.Any()).Return(mockPlacement, mockNode, nil),
+	)
 
 	// ensure mockNode is in the spares
 	found := false
@@ -343,7 +346,10 @@ func TestClusterSetupToRemoveNode(t *testing.T) {
 	mockNode.EXPECT().SetShards(shard.NewShards(nil))
 	mockPlacement = services.NewMockServicePlacement(ctrl)
 	mockPlacement.EXPECT().Instances().Return([]services.PlacementInstance{}).AnyTimes()
-	mpsvc.EXPECT().RemoveInstance(setupNodes[0].ID()).Return(mockPlacement, nil)
+	gomock.InOrder(
+		mpsvc.EXPECT().RemoveInstance(setupNodes[0].ID()).Return(nil, fmt.Errorf("faking error to ensure retries")),
+		mpsvc.EXPECT().RemoveInstance(setupNodes[0].ID()).Return(mockPlacement, nil),
+	)
 
 	err = cluster.RemoveNode(setupNodes[0])
 	require.NoError(t, err)
@@ -410,9 +416,15 @@ func TestClusterSetupToReplaceNode(t *testing.T) {
 	mockNode2 := nodes[2].(*mocknode.MockServiceNode)
 	mockNode1.EXPECT().SetShards(gomock.Any())
 	mockNode2.EXPECT().SetShards(gomock.Any())
-	mpsvc.EXPECT().
-		ReplaceInstance(setupNodes[0].ID(), gomock.Any()).
-		Return(mockPlacement, replacementInstances, nil)
+
+	gomock.InOrder(
+		mpsvc.EXPECT().
+			ReplaceInstance(setupNodes[0].ID(), gomock.Any()).
+			Return(nil, nil, fmt.Errorf("faking error to ensure retries")),
+		mpsvc.EXPECT().
+			ReplaceInstance(setupNodes[0].ID(), gomock.Any()).
+			Return(mockPlacement, replacementInstances, nil),
+	)
 
 	replacementNodes, err := cluster.ReplaceNode(setupNodes[0])
 	require.NoError(t, err)

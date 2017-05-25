@@ -26,6 +26,7 @@ import (
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3x/instrument"
+	"github.com/m3db/m3x/retry"
 )
 
 // Status indicates the different states a Cluster can be in. Refer to the
@@ -180,6 +181,14 @@ type Options interface {
 	// configuration
 	PlacementService() services.PlacementService
 
+	// SetPlacementServiceRetrier sets the retrier to use for placement
+	// service operations
+	SetPlacementServiceRetrier(xretry.Retrier) Options
+
+	// PlacementServiceRetrier returns the retrier to use for placement
+	// service operations
+	PlacementServiceRetrier() xretry.Retrier
+
 	// SetNodeConcurrency sets the number of nodes to operate upon
 	// concurrently
 	SetNodeConcurrency(int) Options
@@ -193,6 +202,4 @@ type Options interface {
 
 	// NodeListener returns the node listener
 	NodeListener() node.Listener
-
-	// TODO(prateek-ref): MustFn
 }

@@ -22,12 +22,14 @@ package cluster
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/node"
 
 	"github.com/m3db/m3cluster/services"
 	"github.com/m3db/m3x/instrument"
+	"github.com/m3db/m3x/retry"
 )
 
 var (
@@ -38,16 +40,17 @@ var (
 )
 
 type clusterOpts struct {
-	iopts           instrument.Options
-	sessionOverride bool
-	token           string
-	svcBuild        build.ServiceBuild
-	svcConf         build.ServiceConfiguration
-	placementSvc    services.PlacementService
-	replication     int
-	numShards       int
-	concurrency     int
-	listener        node.Listener
+	iopts            instrument.Options
+	sessionOverride  bool
+	token            string
+	svcBuild         build.ServiceBuild
+	svcConf          build.ServiceConfiguration
+	placementSvc     services.PlacementService
+	placementRetrier xretry.Retrier
+	replication      int
+	numShards        int
+	concurrency      int
+	listener         node.Listener
 }
 
 // NewOptions returns a new Options object
@@ -59,13 +62,22 @@ func NewOptions(
 		iopts = instrument.NewOptions()
 	}
 	return clusterOpts{
-		iopts:           iopts,
-		sessionOverride: defaultSessionOverride,
-		placementSvc:    placementSvc,
-		replication:     defaultReplication,
-		numShards:       defaultNumShards,
-		concurrency:     defaultConcurrency,
+		iopts:            iopts,
+		sessionOverride:  defaultSessionOverride,
+		replication:      defaultReplication,
+		numShards:        defaultNumShards,
+		concurrency:      defaultConcurrency,
+		placementSvc:     placementSvc,
+		placementRetrier: defaultRetrier(),
 	}
+}
+
+func defaultRetrier() xretry.Retrier {
+	opts := xretry.NewOptions().
+		SetForever(true).
+		SetMaxBackoff(time.Second).
+		SetMaxRetries(10)
+	return xretry.NewRetrier(opts)
 }
 
 func (o clusterOpts) Validate() error {
@@ -158,6 +170,15 @@ func (o clusterOpts) SetPlacementService(psvc services.PlacementService) Options
 
 func (o clusterOpts) PlacementService() services.PlacementService {
 	return o.placementSvc
+}
+
+func (o clusterOpts) SetPlacementServiceRetrier(r xretry.Retrier) Options {
+	o.placementRetrier = r
+	return o
+}
+
+func (o clusterOpts) PlacementServiceRetrier() xretry.Retrier {
+	return o.placementRetrier
 }
 
 func (o clusterOpts) SetNodeConcurrency(c int) Options {
