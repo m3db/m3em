@@ -340,6 +340,9 @@ func (c *svcCluster) RemoveNode(i node.ServiceNode) error {
 	}
 
 	psvc := c.placementSvc
+	// TODO(prateek): this call (and in fact any to the placement service) are racy depending on if
+	// the m3dbnodes themselves are making changes to the placement. They need to be wrapped in a
+	// retrier.
 	newPlacement, err := psvc.RemoveInstance(i.ID())
 	if err != nil {
 		return err
