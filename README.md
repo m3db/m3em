@@ -14,7 +14,7 @@ The goal of `m3em` is to make it easy to create, manage and destroy small M3DB c
 
 ## Components
 There are two primary components in m3em:
-(1) `Cluster`: API construct encapsulating placement interactions, along with process orchestration.
+(1) `Cluster`, `ServiceNode`: API construct encapsulating placement interactions, along with process orchestration.
 
 (2) `m3em_agent`: process running on remote hosts. It's responsible for process lifecycle, heartbeating back to the coordinating host.
 
