@@ -27,6 +27,7 @@ import (
 
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/generated/proto/m3em"
+	"github.com/m3db/m3em/os/fs"
 
 	"github.com/m3db/m3cluster/services"
 	xclock "github.com/m3db/m3x/clock"
@@ -42,7 +43,7 @@ var (
 	errUnableToTeardownNode         = fmt.Errorf("unable to teardown node, must be either setup/running")
 	errUnableToStartNode            = fmt.Errorf("unable to start node, it must be setup")
 	errUnableToStopNode             = fmt.Errorf("unable to stop node, it must be running")
-	errUnableToOverrideConf         = fmt.Errorf("unable to override node configuration, it must be setup")
+	errUnableToTransferFile         = fmt.Errorf("unable to transfer file. node must be setup/running")
 )
 
 type svcNode struct {
@@ -117,6 +118,10 @@ func (i *svcNode) String() string {
 	return fmt.Sprintf("ServiceNode %s", i.PlacementInstance.String())
 }
 
+func (i *svcNode) heartbeatReceived() bool {
+	return !i.heartbeater.lastHeartbeatTime().IsZero()
+}
+
 func (i *svcNode) Setup(
 	bld build.ServiceBuild,
 	conf build.ServiceConfiguration,
@@ -170,13 +175,31 @@ func (i *svcNode) Setup(
 
 	// transfer build
 	if err := i.opts.Retrier().Attempt(func() error {
-		return i.sendFile(bld, m3em.FileType_SERVICE_BINARY, force)
+		iter, err := bld.Iter(i.opts.TransferBufferSize())
+		if err != nil {
+			return err
+		}
+		return i.transferFile(transferOpts{
+			targets:   []string{bld.ID()},
+			fileType:  m3em.FileType_SERVICE_BINARY,
+			overwrite: force,
+			iter:      iter,
+		})
 	}); err != nil {
 		return fmt.Errorf("unable to transfer build: %v", err)
 	}
 
 	if err := i.opts.Retrier().Attempt(func() error {
-		return i.sendFile(conf, m3em.FileType_SERVICE_CONFIG, force)
+		iter, err := conf.Iter(i.opts.TransferBufferSize())
+		if err != nil {
+			return err
+		}
+		return i.transferFile(transferOpts{
+			targets:   []string{conf.ID()},
+			fileType:  m3em.FileType_SERVICE_CONFIG,
+			overwrite: force,
+			iter:      iter,
+		})
 	}); err != nil {
 		return fmt.Errorf("unable to transfer config: %v", err)
 	}
@@ -185,34 +208,29 @@ func (i *svcNode) Setup(
 	return nil
 }
 
-func (i *svcNode) heartbeatReceived() bool {
-	return !i.heartbeater.lastHeartbeatTime().IsZero()
+type transferOpts struct {
+	targets   []string
+	fileType  m3em.FileType
+	iter      fs.FileReaderIter
+	overwrite bool
 }
 
-func (i *svcNode) sendFile(
-	file build.IterableBytesWithID,
-	fileType m3em.FileType,
-	overwrite bool,
+func (i *svcNode) transferFile(
+	t transferOpts,
 ) error {
-	filename := file.ID()
-	iter, err := file.Iter(i.opts.TransferBufferSize())
-	if err != nil {
-		return err
-	}
-	defer iter.Close()
-
+	defer t.iter.Close()
 	ctx := context.Background()
 	stream, err := i.client.Transfer(ctx)
 	if err != nil {
 		return err
 	}
 	chunkIdx := 0
-	for ; iter.Next(); chunkIdx++ {
-		bytes := iter.Current()
+	for ; t.iter.Next(); chunkIdx++ {
+		bytes := t.iter.Current()
 		request := &m3em.TransferRequest{
-			Type:        fileType,
-			TargetPaths: []string{filename},
-			Overwrite:   overwrite,
+			Type:        t.fileType,
+			TargetPaths: t.targets,
+			Overwrite:   t.overwrite,
 			Data: &m3em.DataChunk{
 				Bytes: bytes,
 				Idx:   int32(chunkIdx),
@@ -224,7 +242,7 @@ func (i *svcNode) sendFile(
 			return err
 		}
 	}
-	if err := iter.Err(); err != nil {
+	if err := t.iter.Err(); err != nil {
 		stream.CloseSend()
 		return err
 	}
@@ -238,8 +256,38 @@ func (i *svcNode) sendFile(
 		return fmt.Errorf("sent %d chunks, server only received %d of them", chunkIdx, response.NumChunksRecvd)
 	}
 
-	if iter.Checksum() != response.FileChecksum {
-		return fmt.Errorf("expected file checksum: %d, received: %d", iter.Checksum(), response.FileChecksum)
+	if t.iter.Checksum() != response.FileChecksum {
+		return fmt.Errorf("expected file checksum: %d, received: %d", t.iter.Checksum(), response.FileChecksum)
+	}
+
+	return nil
+}
+
+func (i *svcNode) TransferLocalFile(
+	srcPath string,
+	destPaths []string,
+	overwrite bool,
+) error {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.status != StatusSetup && i.status != StatusRunning {
+		return errUnableToTransferFile
+	}
+
+	if err := i.opts.Retrier().Attempt(func() error {
+		iter, err := fs.NewSizedFileReaderIter(srcPath, i.opts.TransferBufferSize())
+		if err != nil {
+			return err
+		}
+		return i.transferFile(transferOpts{
+			targets:   destPaths,
+			fileType:  m3em.FileType_DATA_FILE,
+			overwrite: overwrite,
+			iter:      iter,
+		})
+	}); err != nil {
+		return fmt.Errorf("unable to transfer file: %v", err)
 	}
 
 	return nil

@@ -114,6 +114,20 @@ type ServiceNode interface {
 	// DeregisterListener un-registers an event listener
 	DeregisterListener(ListenerID)
 
+	// TransferLocalFile transfers a local file to the specified destination paths
+	// NB: destPaths are not allowed to use relative path specifiers, i.e. '..' is illegal;
+	// the eventual destination path on remote hosts is relative to the working directory
+	// of the remote agent.
+	// e.g. if the remote agent has working directory /var/m3em-agent, and we make the call:
+	// svcNode.TransferLocalFile("some/local/file/path/id", []string{"path/id", "another/path/id"})
+	//
+	// upon success, there will be two new files under the remote agent working directory
+	//
+	// /var/m3em-agent/
+	// /var/m3em-agent/path/id          <-- same contents as "some/local/file/path/id"
+	// /var/m3em-agent/another/path/id  <-- same contents as "some/local/file/path/id"
+	TransferLocalFile(localSrc string, destPaths []string, overwrite bool) error
+
 	// TODO(prateek): add operator operations for -
 	// CleanDataDirectory() error
 	// ListDataDirectory(recursive bool, includeContents bool) ([]DirEntry, error)

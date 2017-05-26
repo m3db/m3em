@@ -37,6 +37,8 @@ import (
 	"github.com/m3db/m3em/os/exec"
 	"github.com/m3db/m3em/os/fs"
 
+	"path/filepath"
+
 	xclock "github.com/m3db/m3x/clock"
 	xerrors "github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/instrument"
@@ -409,9 +411,18 @@ type multiWriter struct {
 }
 
 // based on signature of os.OpenFile
-func newMulitWriter(paths []string, flags int, fileMode os.FileMode) (*multiWriter, error) {
+func newMulitWriter(paths []string, flags int, fileMode os.FileMode, dirMode os.FileMode) (*multiWriter, error) {
 	mw := &multiWriter{}
 	for _, p := range paths {
+		// ensure directory exists
+		dir := filepath.Dir(p)
+		err := os.MkdirAll(dir, dirMode)
+		if err != nil {
+			mw.Close() // cleanup
+			return nil, err
+		}
+
+		// create file
 		fd, err := os.OpenFile(p, flags, fileMode)
 		if err != nil {
 			mw.Close() // cleanup
@@ -503,12 +514,13 @@ func (o *opAgent) initFile(
 		flags = flags | os.O_TRUNC
 	}
 
-	perms := os.FileMode(0644)
+	fileMode := os.FileMode(0644)
 	if fileType == m3em.FileType_SERVICE_BINARY {
-		perms = os.FileMode(0755)
+		fileMode = os.FileMode(0755)
 	}
 
-	return newMulitWriter(paths, flags, perms)
+	dirMode := os.FileMode(0755)
+	return newMulitWriter(paths, flags, fileMode, dirMode)
 }
 
 func (o *opAgent) markFileDone(
@@ -555,15 +567,18 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 	}()
 
-	doneFn := func() error {
+	doneFn := func(mw *multiWriter, ft m3em.FileType, cks uint32, numChunks int) error {
 		var me xerrors.MultiError
-		me = me.Add(o.markFileDone(fileType, fileHandle))
+		if mw == nil {
+			return fmt.Errorf("multiwriter has not been initialized")
+		}
+		me = me.Add(o.markFileDone(ft, mw))
 		if err := me.FinalError(); err != nil {
 			me = me.Add(fmt.Errorf("unable to mark file done: %v", err))
 			return me.FinalError()
 		}
 		return stream.SendAndClose(&m3em.TransferResponse{
-			FileChecksum:   checksum,
+			FileChecksum:   cks,
 			NumChunksRecvd: int32(numChunks),
 		})
 	}
@@ -575,7 +590,7 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 
 		if request == nil {
-			return doneFn()
+			return doneFn(fileHandle, fileType, checksum, numChunks)
 		}
 
 		if numChunks == 0 {
@@ -611,7 +626,7 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 
 		if streamErr == io.EOF {
-			return doneFn()
+			return doneFn(fileHandle, fileType, checksum, numChunks)
 		}
 	}
 }
