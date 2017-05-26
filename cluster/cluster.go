@@ -23,7 +23,6 @@ package cluster
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/m3db/m3em/node"
 
@@ -31,7 +30,6 @@ import (
 	"github.com/m3db/m3cluster/shard"
 	"github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/log"
-	"github.com/m3db/m3x/sync"
 )
 
 var (
@@ -114,61 +112,11 @@ func nodeSliceWithoutID(originalSlice node.ServiceNodes, removeID string) node.S
 
 // TODO(prateek): reset initial placement after teardown
 
-// TODO(prateek): migrate concurrentNodeExecutor to the node package
-type concurrentNodeFn func(node.ServiceNode) error
-
-type concurrentNodeExecutor struct {
-	sync.Mutex
-	wg      sync.WaitGroup
-	nodes   node.ServiceNodes
-	workers xsync.WorkerPool
-	fn      concurrentNodeFn
-	err     xerrors.MultiError
-	timeout time.Duration
-}
-
-func newConcurrentNodeExecutor(
+func (c *svcCluster) newExecutor(
 	nodes node.ServiceNodes,
-	concurrency int,
-	timeout time.Duration,
-	fn concurrentNodeFn,
-) *concurrentNodeExecutor {
-	workerPool := xsync.NewWorkerPool(concurrency)
-	workerPool.Init()
-	return &concurrentNodeExecutor{
-		nodes:   nodes,
-		workers: workerPool,
-		fn:      fn,
-		timeout: timeout,
-	}
-}
-
-func (e *concurrentNodeExecutor) addError(err error) {
-	e.Lock()
-	defer e.Unlock()
-	e.err = e.err.Add(err)
-}
-
-func (e *concurrentNodeExecutor) run() error {
-	e.wg.Add(len(e.nodes))
-	for idx := range e.nodes {
-		node := e.nodes[idx]
-		if ok := e.workers.GoWithTimeout(func() {
-			defer e.wg.Done()
-			e.addError(e.fn(node))
-		}, e.timeout); !ok {
-			e.addError(fmt.Errorf("unable to execute node %s operation due to worker timeout", node.ID()))
-		}
-	}
-	e.wg.Wait()
-	return e.err.FinalError()
-}
-
-func (c *svcCluster) newConcurrentNodeExecutor(
-	nodes node.ServiceNodes,
-	fn concurrentNodeFn,
-) *concurrentNodeExecutor {
-	return newConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), c.opts.NodeOperationTimeout(), fn)
+	fn node.ServiceNodeFn,
+) node.ConcurrentExecutor {
+	return node.NewConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), c.opts.NodeOperationTimeout(), fn)
 }
 
 func (c *svcCluster) Placement() services.ServicePlacement {
@@ -200,7 +148,7 @@ func (c *svcCluster) initWithLock() error {
 	)
 
 	// setup all known service nodes with build, config
-	executor := c.newConcurrentNodeExecutor(c.knownNodes, func(node node.ServiceNode) error {
+	executor := c.newExecutor(c.knownNodes, func(node node.ServiceNode) error {
 		err := node.Setup(svcBuild, svcConf, sessionToken, sessionOverride)
 		if err != nil {
 			return err
@@ -211,7 +159,7 @@ func (c *svcCluster) initWithLock() error {
 		}
 		return nil
 	})
-	return executor.run()
+	return executor.Run()
 }
 
 func (c *svcCluster) Setup(numNodes int) ([]node.ServiceNode, error) {
@@ -472,9 +420,9 @@ func (c *svcCluster) Teardown() error {
 		return errClusterUnableToTeardown
 	}
 
-	err := c.newConcurrentNodeExecutor(c.knownNodes, func(node node.ServiceNode) error {
+	err := c.newExecutor(c.knownNodes, func(node node.ServiceNode) error {
 		return node.Teardown()
-	}).run()
+	}).Run()
 
 	for id, usedNode := range c.usedNodes {
 		usedNode.SetShards(shard.NewShards(nil))
@@ -495,9 +443,9 @@ func (c *svcCluster) Start() error {
 		return errUnableToStartUnsetupCluster
 	}
 
-	err := c.newConcurrentNodeExecutor(c.usedNodes.values(), func(node node.ServiceNode) error {
+	err := c.newExecutor(c.usedNodes.values(), func(node node.ServiceNode) error {
 		return node.Start()
-	}).run()
+	}).Run()
 
 	return c.markStatusWithLock(ClusterStatusRunning, err)
 }
@@ -510,9 +458,9 @@ func (c *svcCluster) Stop() error {
 		return errUnableToStopNotRunningCluster
 	}
 
-	err := c.newConcurrentNodeExecutor(c.usedNodes.values(), func(node node.ServiceNode) error {
+	err := c.newExecutor(c.usedNodes.values(), func(node node.ServiceNode) error {
 		return node.Stop()
-	}).run()
+	}).Run()
 
 	return c.markStatusWithLock(ClusterStatusSetup, err)
 }

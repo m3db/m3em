@@ -120,6 +120,16 @@ type ServiceNode interface {
 	// log directory operations
 }
 
+// ServiceNodeFn performs an operation on a given ServiceNode
+type ServiceNodeFn func(ServiceNode) error
+
+// ConcurrentExecutor executes functions on a collection of service
+// nodes concurrently
+type ConcurrentExecutor interface {
+	// Run runs the provide ServiceNodeFn concurrently
+	Run() error
+}
+
 // HeartbeatRouter routes heartbeats based on registered servers
 type HeartbeatRouter interface {
 	hb.HeartbeaterServer
