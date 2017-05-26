@@ -53,7 +53,10 @@ const (
 )
 
 var (
-	errProcessMonitorNotDefined = fmt.Errorf("process monitor not defined")
+	errProcessMonitorNotDefined     = fmt.Errorf("process monitor not defined")
+	errTeardownHeartbeat            = fmt.Errorf("remote agent received Teardown(), turning off heartbeating")
+	errSetupInitializeHostResources = fmt.Errorf("unable to initialize host resources, turning off heartbeating")
+	errHeartbeatSendingTimedout     = fmt.Errorf("heartbeat sending timed out, remote agent reset")
 )
 
 type opAgent struct {
@@ -304,11 +307,14 @@ func (o *opAgent) stopWithLock() error {
 	return nil
 }
 
-func (o *opAgent) resetWithLock() error {
+func (o *opAgent) resetWithLock(heartbeatNotification error) error {
 	var multiErr xerrors.MultiError
 
 	if o.heartbeater != nil {
 		o.logger.Infof("stopping heartbeating")
+		if heartbeatNotification != nil {
+			o.heartbeater.notifyOverwrite(heartbeatNotification)
+		}
 		multiErr = multiErr.Add(o.heartbeater.close())
 		o.heartbeater = nil
 	}
@@ -345,7 +351,7 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	o.Lock()
 	defer o.Unlock()
 
-	if err := o.resetWithLock(); err != nil {
+	if err := o.resetWithLock(errTeardownHeartbeat); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "unable to teardown: %v", err)
 	}
 
@@ -377,14 +383,10 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 		return nil, grpc.Errorf(codes.AlreadyExists, "agent already initialized with token: %s", o.token)
 	}
 
-	// stop existing heartbeating if any
-	if o.heartbeater != nil {
-		o.heartbeater.notifyOverwrite(fmt.Errorf("heartbeating being overwritten by new setup request: %+v", *request))
-	}
-
 	if o.isSetupWithLock() {
 		// reset agent
-		if err := o.resetWithLock(); err != nil {
+		msg := fmt.Errorf("heartbeating being overwritten by new setup request: %+v", *request)
+		if err := o.resetWithLock(msg); err != nil {
 			return nil, grpc.Errorf(codes.Aborted, "unable to reset: %v", err)
 		}
 	}
@@ -399,7 +401,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 	// initialize any resources needed on the host
 	o.logger.Infof("initializing host resources")
 	if err := o.opts.InitHostResourcesFn()(); err != nil {
-		o.resetWithLock() // release any resources
+		o.resetWithLock(errSetupInitializeHostResources) // release any resources
 		return nil, grpc.Errorf(codes.Internal, "unable to initialize host resources: %v", err)
 	}
 
@@ -408,7 +410,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 		o.heartbeatTimeoutCh = make(chan struct{})
 		beater, err := newHeartbeater(o, o.heartbeatTimeoutCh, request.OperatorUuid, request.HeartbeatEndpoint, o.opts.InstrumentOptions())
 		if err != nil {
-			o.resetWithLock() // release any resources
+			o.resetWithLock(errSetupInitializeHostResources) // release any resources
 			return nil, grpc.Errorf(codes.Aborted, "unable to start heartbeating process: %v", err)
 		}
 		o.heartbeater = beater
@@ -422,9 +424,9 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 func (o *opAgent) monitorHeartbeatTimeout(timeoutCh chan struct{}) {
 	for range timeoutCh {
-		o.logger.Warnf("heartbeat sending timed out, resetting agent")
+		o.logger.Warnf("heartbeat sending timed out, remote agent reset")
 		o.Lock()
-		err := o.resetWithLock()
+		err := o.resetWithLock(nil)
 		o.Unlock()
 		if err == nil {
 			o.logger.Infof("successfully reset agent")
