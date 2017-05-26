@@ -85,7 +85,7 @@ func TestHeartbeatTimeout(t *testing.T) {
 
 	// stop the heartbeating router so we don't get any more updates
 	th.StopHeartbeatServer()
-	time.Sleep(th.nodeOptions.HeartbeatOptions().Timeout())
+	time.Sleep(2 * th.nodeOptions.HeartbeatOptions().Timeout())
 
 	// ensure we were notified of exit at the operator level
 	require.True(t, receivedTimeout)
