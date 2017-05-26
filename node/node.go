@@ -210,11 +210,13 @@ func (i *svcNode) sendFile(
 	for ; iter.Next(); chunkIdx++ {
 		bytes := iter.Current()
 		request := &m3em.TransferRequest{
-			Type:       fileType,
-			Filename:   filename,
-			Overwrite:  overwrite,
-			ChunkBytes: bytes,
-			ChunkIdx:   int32(chunkIdx),
+			Type:        fileType,
+			TargetPaths: []string{filename},
+			Overwrite:   overwrite,
+			Data: &m3em.DataChunk{
+				Bytes: bytes,
+				Idx:   int32(chunkIdx),
+			},
 		}
 		err := stream.Send(request)
 		if err != nil {

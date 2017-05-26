@@ -344,7 +344,7 @@ func TestClientReconnect(t *testing.T) {
 	defer hbServer.Stop()
 
 	// ensure heartbeating has restarted
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 	beats = hbService.heartbeats()
 	require.NotEmpty(t, beats)
 }

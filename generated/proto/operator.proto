@@ -34,6 +34,7 @@ enum FileType {
   UNKNOWN        = 0;
   SERVICE_BINARY = 1;
   SERVICE_CONFIG = 2;
+  DATA_FILE      = 3;
   // log file
 }
 
@@ -49,12 +50,19 @@ message SetupRequest {
 message SetupResponse {
 }
 
+// TransferRequest(s) are used to transfer files from the master to
+// remote agents.
 message TransferRequest {
-  FileType type          = 1;
-  string   filename      = 2;
-  bool     overwrite     = 3;
-  int32    chunk_idx     = 4;
-  bytes    chunk_bytes   = 5;
+           FileType  type         = 1;
+           bool      overwrite    = 2;
+  // target_paths indicate the copies, and relative paths to copy the file to
+  repeated string    target_paths = 3;
+           DataChunk data         = 4;
+}
+
+message DataChunk {
+  int32  idx   = 1;
+  bytes  bytes = 2;
 }
 
 message TransferResponse {

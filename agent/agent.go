@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,6 +58,8 @@ var (
 	errTeardownHeartbeat            = fmt.Errorf("remote agent received Teardown(), turning off heartbeating")
 	errSetupInitializeHostResources = fmt.Errorf("unable to initialize host resources, turning off heartbeating")
 	errHeartbeatSendingTimedout     = fmt.Errorf("heartbeat sending timed out, remote agent reset")
+	errNoValidTargetsSpecified      = fmt.Errorf("no valid target destinations specified")
+	errOnlyDataFileMultiTarget      = fmt.Errorf("multiple targets are only supported for data files")
 )
 
 type opAgent struct {
@@ -162,44 +165,6 @@ func (o *opAgent) state() (bool, string, string) {
 	o.RLock()
 	defer o.RUnlock()
 	return o.Running(), o.executablePath, o.configPath
-}
-
-func (o *opAgent) initFile(
-	fileType m3em.FileType,
-	filename string,
-	overwrite bool,
-) (*os.File, error) {
-	targetFile := path.Join(o.opts.WorkingDirectory(), filename)
-	if _, err := os.Stat(targetFile); os.IsExist(err) && !overwrite {
-		return nil, err
-	}
-
-	flags := os.O_CREATE | os.O_WRONLY
-	if overwrite {
-		flags = flags | os.O_TRUNC
-	}
-
-	perms := os.FileMode(0644)
-	if fileType == m3em.FileType_SERVICE_BINARY {
-		perms = os.FileMode(0755)
-	}
-	return os.OpenFile(targetFile, flags, perms)
-}
-
-func (o *opAgent) markFileDone(
-	fileType m3em.FileType,
-	filename string,
-) {
-	o.Lock()
-	defer o.Unlock()
-	switch fileType {
-	case m3em.FileType_SERVICE_BINARY:
-		o.executablePath = filename
-	case m3em.FileType_SERVICE_CONFIG:
-		o.configPath = filename
-	default:
-		o.logger.Warnf("received unknown fileType: %v, filename: %s", fileType, filename)
-	}
 }
 
 func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.StartResponse, error) {
@@ -424,9 +389,9 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 func (o *opAgent) monitorHeartbeatTimeout(timeoutCh chan struct{}) {
 	for range timeoutCh {
-		o.logger.Warnf("heartbeat sending timed out, remote agent reset")
+		o.logger.Warnf("heartbeat sending timed out, resetting agent")
 		o.Lock()
-		err := o.resetWithLock(nil)
+		err := o.resetWithLock(nil) // nil indicates we don't want to send a heartbeat
 		o.Unlock()
 		if err == nil {
 			o.logger.Infof("successfully reset agent")
@@ -437,13 +402,148 @@ func (o *opAgent) monitorHeartbeatTimeout(timeoutCh chan struct{}) {
 	}
 }
 
+// non-thread safe multi-writer
+type multiWriter struct {
+	io.Closer
+	fds []*os.File
+}
+
+// based on signature of os.OpenFile
+func newMulitWriter(paths []string, flags int, fileMode os.FileMode) (*multiWriter, error) {
+	mw := &multiWriter{}
+	for _, p := range paths {
+		fd, err := os.OpenFile(p, flags, fileMode)
+		if err != nil {
+			mw.Close() // cleanup
+			return nil, err
+		}
+		mw.fds = append(mw.fds, fd)
+	}
+	return mw, nil
+}
+
+// mimics signature of os.File.Write
+func (mw *multiWriter) write(b []byte) (int, error) {
+	var (
+		first = true
+		n     int
+		err   error
+	)
+
+	// write the provided data to all fds, terminating
+	// early if any fd write fails or is not the same
+	// as the others
+	for _, fd := range mw.fds {
+		// initialize for the first fd
+		if first {
+			n, err = fd.Write(b)
+			first = false
+			if err != nil {
+				return n, err
+			}
+			continue
+		}
+
+		// for the rest of the fds, ensure
+		// they all write the same number of bytes
+		// as the first one
+		ni, err := fd.Write(b)
+		if err != nil {
+			return n, err
+		}
+		if ni != n {
+			return 0, fmt.Errorf("unable to write same data to all fds")
+		}
+	}
+	return n, nil
+}
+
+func (mw *multiWriter) Close() error {
+	var me xerrors.MultiError
+	for _, fd := range mw.fds {
+		me = me.Add(fd.Close())
+	}
+	return me.FinalError()
+}
+
+func (o *opAgent) pathsRelativeToWorkingDir(
+	targets []string,
+) ([]string, error) {
+	files := make([]string, 0, len(targets))
+	for _, t := range targets {
+		if strings.Contains(t, "..") { // i.e. relative path
+			return nil, fmt.Errorf("relative paths not allowed: %v", t)
+		}
+		f := path.Join(o.opts.WorkingDirectory(), t)
+		files = append(files, f)
+	}
+	return files, nil
+}
+
+func (o *opAgent) initFile(
+	fileType m3em.FileType,
+	targets []string,
+	overwrite bool,
+) (*multiWriter, error) {
+	if len(targets) < 1 {
+		return nil, errNoValidTargetsSpecified
+	}
+
+	if len(targets) > 1 && fileType != m3em.FileType_DATA_FILE {
+		return nil, errOnlyDataFileMultiTarget
+	}
+
+	paths, err := o.pathsRelativeToWorkingDir(targets)
+	if err != nil {
+		return nil, err
+	}
+
+	flags := os.O_CREATE | os.O_WRONLY
+	if overwrite {
+		flags = flags | os.O_TRUNC
+	}
+
+	perms := os.FileMode(0644)
+	if fileType == m3em.FileType_SERVICE_BINARY {
+		perms = os.FileMode(0755)
+	}
+
+	return newMulitWriter(paths, flags, perms)
+}
+
+func (o *opAgent) markFileDone(
+	fileType m3em.FileType,
+	mw *multiWriter,
+) error {
+	// should never happen
+	if len(mw.fds) != 1 && (fileType == m3em.FileType_SERVICE_BINARY || fileType == m3em.FileType_SERVICE_CONFIG) {
+		return fmt.Errorf("internal error: multiple targets for binary/config")
+	}
+
+	o.Lock()
+	defer o.Unlock()
+
+	switch fileType {
+	case m3em.FileType_SERVICE_BINARY:
+		o.executablePath = mw.fds[0].Name()
+	case m3em.FileType_SERVICE_CONFIG:
+		o.configPath = mw.fds[0].Name()
+	case m3em.FileType_DATA_FILE:
+		o.logger.Debug("marking data file done") // nothing to do here
+	default:
+		o.logger.Warnf("received unknown fileType: %v", fileType)
+	}
+
+	return nil
+}
+
 func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 	o.logger.Infof("receieved Transfer()")
 	var (
 		checksum     = uint32(0)
 		numChunks    = 0
 		lastChunkIdx = int32(0)
-		fileHandle   *os.File
+		fileHandle   *multiWriter
 		fileType     = m3em.FileType_UNKNOWN
 		err          error
 	)
@@ -454,6 +554,19 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 	}()
 
+	doneFn := func() error {
+		var me xerrors.MultiError
+		me = me.Add(o.markFileDone(fileType, fileHandle))
+		if err := me.FinalError(); err != nil {
+			me = me.Add(fmt.Errorf("unable to mark file done: %v", err))
+			return me.FinalError()
+		}
+		return stream.SendAndClose(&m3em.TransferResponse{
+			FileChecksum:   checksum,
+			NumChunksRecvd: int32(numChunks),
+		})
+	}
+
 	for {
 		request, streamErr := stream.Recv()
 		if streamErr != nil && streamErr != io.EOF {
@@ -461,37 +574,33 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 
 		if request == nil {
-			o.markFileDone(fileType, fileHandle.Name())
-			return stream.SendAndClose(&m3em.TransferResponse{
-				FileChecksum:   checksum,
-				NumChunksRecvd: int32(numChunks),
-			})
+			return doneFn()
 		}
 
 		if numChunks == 0 {
 			// first request with any data in it, log it for visibilty
-			o.logger.Infof("file transfer initiated: [ filename = %s, fileType = %s, overwrite = %s ]",
-				request.GetFilename(), request.GetType().String(), request.GetOverwrite())
+			o.logger.Infof("file transfer initiated: [ targets = %+v, fileType = %s, overwrite = %s ]",
+				request.GetTargetPaths(), request.GetType().String(), request.GetOverwrite())
 
 			fileType = request.GetType()
-			fileHandle, err = o.initFile(fileType, request.GetFilename(), request.GetOverwrite())
+			fileHandle, err = o.initFile(fileType, request.GetTargetPaths(), request.GetOverwrite())
 			if err != nil {
 				return err
 			}
-			lastChunkIdx = request.GetChunkIdx() - 1
+			lastChunkIdx = request.GetData().GetIdx() - 1
 		}
 
-		chunkIdx := request.GetChunkIdx()
+		chunkIdx := request.GetData().GetIdx()
 		if chunkIdx != int32(1+lastChunkIdx) {
 			return fmt.Errorf("received chunkIdx: %d after %d", chunkIdx, lastChunkIdx)
 		}
 		lastChunkIdx = chunkIdx
 
 		numChunks++
-		bytes := request.GetChunkBytes()
+		bytes := request.GetData().GetBytes()
 		checksum = crc32.Update(checksum, crc32.IEEETable, bytes)
 
-		numWritten, err := fileHandle.Write(bytes)
+		numWritten, err := fileHandle.write(bytes)
 		if err != nil {
 			return err
 		}
@@ -501,11 +610,7 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 
 		if streamErr == io.EOF {
-			o.markFileDone(fileType, fileHandle.Name())
-			return stream.SendAndClose(&m3em.TransferResponse{
-				FileChecksum:   checksum,
-				NumChunksRecvd: int32(numChunks),
-			})
+			return doneFn()
 		}
 	}
 }
