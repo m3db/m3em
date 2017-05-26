@@ -39,8 +39,8 @@ type executor struct {
 	err     xerrors.MultiError
 }
 
-// NewConcurrentNodeExecutor returns a new concurrent executor
-func NewConcurrentNodeExecutor(
+// NewConcurrentExecutor returns a new concurrent executor
+func NewConcurrentExecutor(
 	nodes []ServiceNode,
 	concurrency int,
 	timeout time.Duration,

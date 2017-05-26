@@ -116,7 +116,7 @@ func (c *svcCluster) newExecutor(
 	nodes node.ServiceNodes,
 	fn node.ServiceNodeFn,
 ) node.ConcurrentExecutor {
-	return node.NewConcurrentNodeExecutor(nodes, c.opts.NodeConcurrency(), c.opts.NodeOperationTimeout(), fn)
+	return node.NewConcurrentExecutor(nodes, c.opts.NodeConcurrency(), c.opts.NodeOperationTimeout(), fn)
 }
 
 func (c *svcCluster) Placement() services.ServicePlacement {
