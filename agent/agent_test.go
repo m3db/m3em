@@ -107,7 +107,7 @@ func TestProgramCrashNotify(t *testing.T) {
 	hb.RegisterHeartbeaterServer(hbServer, hbService)
 	require.NoError(t, err)
 	go hbServer.Serve(hbListener)
-	defer hbServer.GracefulStop()
+	defer hbServer.Stop()
 
 	opts := newTestOptions(t, tempDir)
 	testAgent, err := New(opts)
@@ -225,10 +225,126 @@ func TestTooManyFailedHeartbeatsStop(t *testing.T) {
 	require.False(t, rawAgent.isSetup())
 }
 
-func TestOverwriteExistingHeartbeater(t *testing.T) {
-	// TODO(prateek): implement this
+func TestSetupOverrite(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tempDir := newTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	hbService := &mockHeartbeatServer{}
+	hbListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+	hb.RegisterHeartbeaterServer(hbServer, hbService)
+	go hbServer.Serve(hbListener)
+	defer hbServer.Stop()
+
+	opts := newTestOptions(t, tempDir)
+	testAgent, err := New(opts)
+	require.NoError(t, err)
+	rawAgent, ok := testAgent.(*opAgent)
+	require.True(t, ok)
+
+	setupResp, err := rawAgent.Setup(context.Background(), &m3em.SetupRequest{
+		SessionToken:           "abc",
+		HeartbeatEnabled:       true,
+		HeartbeatFrequencySecs: 1,
+		HeartbeatEndpoint:      hbListener.Addr().String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, setupResp)
+
+	// ensure heartbeating has started
+	time.Sleep(time.Second)
+	beats := hbService.heartbeats()
+	require.NotEmpty(t, beats)
+
+	// make new heartbeatServer
+	newHbService := &mockHeartbeatServer{}
+	newHbListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	newHbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+	hb.RegisterHeartbeaterServer(newHbServer, newHbService)
+	go newHbServer.Serve(newHbListener)
+	defer newHbServer.Stop()
+
+	// ask agent to send messages to new hb server
+	setupResp, err = rawAgent.Setup(context.Background(), &m3em.SetupRequest{
+		SessionToken:           "other",
+		Force:                  true,
+		HeartbeatEnabled:       true,
+		HeartbeatFrequencySecs: 1,
+		HeartbeatEndpoint:      newHbListener.Addr().String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, setupResp)
+
+	// old hb service should receive no more messages
+	oldHBBeatsT0 := hbService.heartbeats()
+
+	// ensure new heartbeating has started
+	time.Sleep(time.Second)
+	newHBBeats := newHbService.heartbeats()
+	require.NotEmpty(t, newHBBeats)
+
+	// old hb service should not have received any more messages
+	oldHBBeatsT1 := hbService.heartbeats()
+	require.Equal(t, oldHBBeatsT0, oldHBBeatsT1)
 }
 
 func TestClientReconnect(t *testing.T) {
-	// TODO(prateek): implement this
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tempDir := newTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	hbService := &mockHeartbeatServer{}
+	hbListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	// holding onto address as we'll need to open the listener again
+	listenAddress := hbListener.Addr().String()
+
+	hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+	hb.RegisterHeartbeaterServer(hbServer, hbService)
+	go hbServer.Serve(hbListener)
+
+	opts := newTestOptions(t, tempDir)
+	testAgent, err := New(opts)
+	require.NoError(t, err)
+	rawAgent, ok := testAgent.(*opAgent)
+	require.True(t, ok)
+
+	setupResp, err := rawAgent.Setup(context.Background(), &m3em.SetupRequest{
+		SessionToken:           "abc",
+		HeartbeatEnabled:       true,
+		HeartbeatFrequencySecs: 1,
+		HeartbeatEndpoint:      listenAddress,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, setupResp)
+
+	// ensure heartbeating has started
+	time.Sleep(time.Second)
+	beats := hbService.heartbeats()
+	require.NotEmpty(t, beats)
+
+	// crash heartbeat server
+	hbServer.Stop()
+
+	// re-start heartbeat server after a second
+	time.Sleep(time.Second)
+	hbService = &mockHeartbeatServer{}
+	hbListener, err = net.Listen("tcp", listenAddress)
+	require.NoError(t, err)
+	hbServer = grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+	hb.RegisterHeartbeaterServer(hbServer, hbService)
+	go hbServer.Serve(hbListener)
+	defer hbServer.Stop()
+
+	// ensure heartbeating has restarted
+	time.Sleep(time.Second)
+	beats = hbService.heartbeats()
+	require.NotEmpty(t, beats)
 }

@@ -355,6 +355,10 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 func (o *opAgent) isSetup() bool {
 	o.RLock()
 	defer o.RUnlock()
+	return o.isSetupWithLock()
+}
+
+func (o *opAgent) isSetupWithLock() bool {
 	return o.token != ""
 }
 
@@ -378,9 +382,11 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 		o.heartbeater.notifyOverwrite(fmt.Errorf("heartbeating being overwritten by new setup request: %+v", *request))
 	}
 
-	// reset agent
-	if err := o.resetWithLock(); err != nil {
-		return nil, grpc.Errorf(codes.Aborted, "unable to reset: %v", err)
+	if o.isSetupWithLock() {
+		// reset agent
+		if err := o.resetWithLock(); err != nil {
+			return nil, grpc.Errorf(codes.Aborted, "unable to reset: %v", err)
+		}
 	}
 
 	// remove any files stored in the working directory
