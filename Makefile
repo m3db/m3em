@@ -40,12 +40,12 @@ $(SERVICE): setup
 	@echo Building $(SERVICE)
 	$(VENDOR_ENV) go build -o $(BUILD)/$(SERVICE) ./services/$(SERVICE)/.
 
-prod-$(SERVICE):
+$(SERVICE)-linux-amd64:
 	$(LINUX_AMD64_ENV) make $(SERVICE)
 endef
 
 services: $(SERVICES)
-prod-services:
+services-linux-amd64:
 	$(LINUX_AMD64_ENV) make services
 
 $(foreach SERVICE,$(SERVICES),$(eval $(SERVICE_RULES)))
