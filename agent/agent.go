@@ -520,18 +520,19 @@ func (o *opAgent) markFileDone(
 		return fmt.Errorf("internal error: multiple targets for binary/config")
 	}
 
+	for _, fd := range mw.fds {
+		o.logger.Infof("file transferred: [ type = %s, path = %s ]", fileType.String(), fd.Name())
+	}
+
 	o.Lock()
 	defer o.Unlock()
 
-	switch fileType {
-	case m3em.FileType_SERVICE_BINARY:
+	if fileType == m3em.FileType_SERVICE_BINARY {
 		o.executablePath = mw.fds[0].Name()
-	case m3em.FileType_SERVICE_CONFIG:
+	}
+
+	if fileType == m3em.FileType_SERVICE_CONFIG {
 		o.configPath = mw.fds[0].Name()
-	case m3em.FileType_DATA_FILE:
-		o.logger.Debug("marking data file done") // nothing to do here
-	default:
-		o.logger.Warnf("received unknown fileType: %v", fileType)
 	}
 
 	return nil
