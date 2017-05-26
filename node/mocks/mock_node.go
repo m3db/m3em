@@ -243,6 +243,16 @@ func (_mr *_MockServiceNodeRecorder) Teardown() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Teardown")
 }
 
+func (_m *MockServiceNode) TransferLocalFile(_param0 string, _param1 []string, _param2 bool) error {
+	ret := _m.ctrl.Call(_m, "TransferLocalFile", _param0, _param1, _param2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockServiceNodeRecorder) TransferLocalFile(arg0, arg1, arg2 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "TransferLocalFile", arg0, arg1, arg2)
+}
+
 func (_m *MockServiceNode) Weight() uint32 {
 	ret := _m.ctrl.Call(_m, "Weight")
 	ret0, _ := ret[0].(uint32)
