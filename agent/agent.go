@@ -515,8 +515,8 @@ func (o *opAgent) markFileDone(
 	fileType m3em.FileType,
 	mw *multiWriter,
 ) error {
-	// should never happen
 	if len(mw.fds) != 1 && (fileType == m3em.FileType_SERVICE_BINARY || fileType == m3em.FileType_SERVICE_CONFIG) {
+		// should never happen
 		return fmt.Errorf("internal error: multiple targets for binary/config")
 	}
 
