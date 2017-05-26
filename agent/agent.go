@@ -63,16 +63,17 @@ type opAgent struct {
 	configPath          string
 	newProcessMonitorFn newProcessMonitorFn
 	processMonitor      exec.ProcessMonitor
+	heartbeater         *opAgentHeartBeater
 
-	opts               Options
-	logger             xlog.Logger
 	running            int32
 	stopping           int32
-	heartbeater        *opAgentHeartBeater
 	heartbeatTimeoutCh chan struct{}
-	metrics            *opAgentMetrics
-	doneCh             chan struct{}
-	closeCh            chan struct{}
+
+	opts    Options
+	logger  xlog.Logger
+	metrics *opAgentMetrics
+	doneCh  chan struct{}
+	closeCh chan struct{}
 }
 
 type newProcessMonitorFn func(exec.Cmd, exec.ProcessListener) (exec.ProcessMonitor, error)
@@ -618,7 +619,7 @@ func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
 	// check if this has been happening for past the permitted period
 	timeSinceLastSend := h.nowFn().Sub(h.lastHeartbeatTs)
 	timeout := h.agent.opts.HeartbeatTimeout()
-	if !h.lastHeartbeatTs.IsZero() && timeSinceLastSend > timeout {
+	if timeSinceLastSend > timeout {
 		logger.Warnf("unable to send heartbeats for %s; timing out", timeSinceLastSend.String())
 		h.agent.heartbeatTimeoutCh <- struct{}{}
 	}
