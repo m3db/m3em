@@ -22,10 +22,12 @@ package agent
 
 import (
 	"io"
+	"time"
 
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 
+	xclock "github.com/m3db/m3x/clock"
 	"github.com/m3db/m3x/instrument"
 )
 
@@ -80,7 +82,19 @@ type Options interface {
 	// EnvMap returns the EnvMap used to execute any child processes
 	EnvMap() exec.EnvMap
 
-	// TODO(prateek): process monitor opts, metric for process uptime
+	// SetHeartbeatTimeout sets the duration after which failed attempts at
+	// sending heartbeats will trigger the agent to reset itself
+	SetHeartbeatTimeout(time.Duration) Options
+
+	// HeartbeatTimeout sets the duration after which failed attempts at
+	// sending heartbeats will trigger the agent to reset itself
+	HeartbeatTimeout() time.Duration
+
+	// SetNowFn sets the now fn
+	SetNowFn(xclock.NowFn) Options
+
+	// NowFn returns the now fn
+	NowFn() xclock.NowFn
 }
 
 // HostResourcesFn is used by the Agent to capture/release any resources

@@ -49,6 +49,7 @@ func newTempDir(t *testing.T) string {
 func newTestOptions(t *testing.T, workingDir string) Options {
 	iopts := instrument.NewOptions()
 	return NewOptions(iopts).
+		SetHeartbeatTimeout(2 * time.Second).
 		SetWorkingDirectory(workingDir).
 		SetExecGenFn(func(p string, c string) (string, []string) {
 			return p, nil
@@ -75,6 +76,22 @@ func (mh *mockHeartbeatServer) heartbeats() []hb.HeartbeatRequest {
 		beats = append(beats, b)
 	}
 	return beats
+}
+
+func TestAgentClose(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tempDir := newTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	opts := newTestOptions(t, tempDir)
+	testAgent, err := New(opts)
+	require.NoError(t, err)
+	rawAgent, ok := testAgent.(*opAgent)
+	require.True(t, ok)
+
+	require.NoError(t, rawAgent.Close())
 }
 
 func TestProgramCrashNotify(t *testing.T) {
@@ -106,6 +123,7 @@ func TestProgramCrashNotify(t *testing.T) {
 	}
 
 	setupResp, err := rawAgent.Setup(context.Background(), &m3em.SetupRequest{
+		SessionToken:           "abc",
 		HeartbeatEnabled:       true,
 		HeartbeatFrequencySecs: 1,
 		HeartbeatEndpoint:      hbListener.Addr().String(),
@@ -129,7 +147,7 @@ func TestProgramCrashNotify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, stopResp)
 
-	// ensure no terminaltion message received in hb server
+	// ensure no termination message received in hb server
 	time.Sleep(time.Second)
 	beats := hbService.heartbeats()
 	require.NotEmpty(t, beats)
@@ -138,6 +156,73 @@ func TestProgramCrashNotify(t *testing.T) {
 			require.Fail(t, "received unexpected heartbeat message")
 		}
 	}
+}
+
+func TestTooManyFailedHeartbeatsUnsetup(t *testing.T) {
+	tempDir := newTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	opts := newTestOptions(t, tempDir)
+	testAgent, err := New(opts)
+	require.NoError(t, err)
+	rawAgent, ok := testAgent.(*opAgent)
+	require.True(t, ok)
+
+	setupResp, err := rawAgent.Setup(context.Background(), &m3em.SetupRequest{
+		SessionToken:           "some-token",
+		HeartbeatEnabled:       true,
+		HeartbeatFrequencySecs: 1,
+		HeartbeatEndpoint:      "badaddress.com:80",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, setupResp)
+
+	// ensure agent has reset itself after timeout
+	time.Sleep(2 * opts.HeartbeatTimeout())
+	require.False(t, rawAgent.isSetup())
+}
+
+func TestTooManyFailedHeartbeatsStop(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tempDir := newTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	opts := newTestOptions(t, tempDir)
+	testAgent, err := New(opts)
+	require.NoError(t, err)
+	rawAgent, ok := testAgent.(*opAgent)
+	require.True(t, ok)
+
+	pm := mockexec.NewMockProcessMonitor(ctrl)
+	rawAgent.newProcessMonitorFn = func(c exec.Cmd, l exec.ProcessListener) (exec.ProcessMonitor, error) {
+		return pm, nil
+	}
+
+	setupResp, err := rawAgent.Setup(context.Background(), &m3em.SetupRequest{
+		SessionToken:           "abc",
+		HeartbeatEnabled:       true,
+		HeartbeatFrequencySecs: 1,
+		HeartbeatEndpoint:      "baddaddress.com:80",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, setupResp)
+
+	rawAgent.executablePath = "someString"
+	rawAgent.configPath = "otherString"
+
+	pm.EXPECT().Start().Return(nil)
+	startResp, err := rawAgent.Start(context.Background(), &m3em.StartRequest{})
+	require.NoError(t, err)
+	require.NotNil(t, startResp)
+	time.Sleep(time.Second)
+
+	pm.EXPECT().Stop().Return(nil)
+
+	// ensure agent has reset itself after timeout
+	time.Sleep(2 * opts.HeartbeatTimeout())
+	require.False(t, rawAgent.isSetup())
 }
 
 func TestOverwriteExistingHeartbeater(t *testing.T) {

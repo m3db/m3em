@@ -22,10 +22,16 @@ package agent
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/m3db/m3em/os/exec"
 
+	xclock "github.com/m3db/m3x/clock"
 	"github.com/m3db/m3x/instrument"
+)
+
+const (
+	defaultHeartbeatTimeout = 2 * time.Minute
 )
 
 var (
@@ -35,20 +41,24 @@ var (
 )
 
 type opts struct {
-	iopts      instrument.Options
-	workingDir string
-	execGenFn  ExecGenFn
-	initFn     HostResourcesFn
-	releaseFn  HostResourcesFn
-	envMap     exec.EnvMap
+	iopts            instrument.Options
+	workingDir       string
+	execGenFn        ExecGenFn
+	initFn           HostResourcesFn
+	releaseFn        HostResourcesFn
+	envMap           exec.EnvMap
+	heartbeatTimeout time.Duration
+	nowFn            xclock.NowFn
 }
 
 // NewOptions constructs new options
 func NewOptions(io instrument.Options) Options {
 	return &opts{
-		iopts:     io,
-		initFn:    defaultNoErrorFn,
-		releaseFn: defaultNoErrorFn,
+		iopts:            io,
+		initFn:           defaultNoErrorFn,
+		releaseFn:        defaultNoErrorFn,
+		heartbeatTimeout: defaultHeartbeatTimeout,
+		nowFn:            time.Now,
 	}
 }
 
@@ -116,4 +126,22 @@ func (o *opts) SetEnvMap(em exec.EnvMap) Options {
 
 func (o *opts) EnvMap() exec.EnvMap {
 	return o.envMap
+}
+
+func (o *opts) SetHeartbeatTimeout(t time.Duration) Options {
+	o.heartbeatTimeout = t
+	return o
+}
+
+func (o *opts) HeartbeatTimeout() time.Duration {
+	return o.heartbeatTimeout
+}
+
+func (o *opts) SetNowFn(fn xclock.NowFn) Options {
+	o.nowFn = fn
+	return o
+}
+
+func (o *opts) NowFn() xclock.NowFn {
+	return o.nowFn
 }

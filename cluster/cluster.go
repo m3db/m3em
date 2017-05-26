@@ -114,6 +114,7 @@ func nodeSliceWithoutID(originalSlice node.ServiceNodes, removeID string) node.S
 
 // TODO(prateek): reset initial placement after teardown
 
+// TODO(prateek): migrate concurrentNodeExecutor to the node package
 type concurrentNodeFn func(node.ServiceNode) error
 
 type concurrentNodeExecutor struct {
