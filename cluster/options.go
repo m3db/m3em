@@ -32,11 +32,12 @@ import (
 	"github.com/m3db/m3x/retry"
 )
 
-var (
-	defaultSessionOverride = false
-	defaultReplication     = 3
-	defaultConcurrency     = 10
-	defaultNumShards       = 1024
+const (
+	defaultSessionOverride      = false
+	defaultReplication          = 3
+	defaultConcurrency          = 10
+	defaultNumShards            = 1024
+	defaultNodeOperationTimeout = 2 * time.Minute
 )
 
 type clusterOpts struct {
@@ -50,6 +51,7 @@ type clusterOpts struct {
 	replication      int
 	numShards        int
 	concurrency      int
+	nodeOpTimeout    time.Duration
 	listener         node.Listener
 }
 
@@ -67,6 +69,7 @@ func NewOptions(
 		replication:      defaultReplication,
 		numShards:        defaultNumShards,
 		concurrency:      defaultConcurrency,
+		nodeOpTimeout:    defaultNodeOperationTimeout,
 		placementSvc:     placementSvc,
 		placementRetrier: defaultRetrier(),
 	}
@@ -188,6 +191,15 @@ func (o clusterOpts) SetNodeConcurrency(c int) Options {
 
 func (o clusterOpts) NodeConcurrency() int {
 	return o.concurrency
+}
+
+func (o clusterOpts) SetNodeOperationTimeout(t time.Duration) Options {
+	o.nodeOpTimeout = t
+	return o
+}
+
+func (o clusterOpts) NodeOperationTimeout() time.Duration {
+	return o.nodeOpTimeout
 }
 
 func (o clusterOpts) SetNodeListener(l node.Listener) Options {

@@ -346,6 +346,7 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 }
 
 func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.SetupResponse, error) {
+	o.logger.Infof("receieved Setup()")
 	if request == nil {
 		return nil, grpc.Errorf(codes.InvalidArgument, "nil request")
 	}

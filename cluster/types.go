@@ -21,6 +21,8 @@
 package cluster
 
 import (
+	"time"
+
 	"github.com/m3db/m3em/build"
 	"github.com/m3db/m3em/node"
 
@@ -196,6 +198,12 @@ type Options interface {
 	// NodeConcurrency returns the number of nodes to operate upon
 	// concurrently
 	NodeConcurrency() int
+
+	// SetNodeOperationTimeout sets the timeout for a node operation
+	SetNodeOperationTimeout(time.Duration) Options
+
+	// NodeOperationTimeout returns the timeout for a node operation
+	NodeOperationTimeout() time.Duration
 
 	// SetNodeListener sets default node listener
 	SetNodeListener(node.Listener) Options
