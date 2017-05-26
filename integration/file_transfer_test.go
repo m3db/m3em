@@ -43,13 +43,11 @@ func TestFileTransfer(t *testing.T) {
 	buildContents := []byte("some long string of text\nthat goes on and on\n")
 	testFile := th.newTempFile(buildContents)
 	testBuildID := "target-file.out"
-	targetBuildFile := path.Join(th.workingDir, testBuildID)
 	testBinary := build.NewServiceBuild(testBuildID, testFile.Name())
 
 	// create test config
 	confContents := []byte("some longer string of text\nthat goes on, on and on\n")
 	testConfigID := "target-file.conf"
-	targetConfigFile := path.Join(th.workingDir, testConfigID)
 	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
 	th.Start()
@@ -59,12 +57,14 @@ func TestFileTransfer(t *testing.T) {
 	require.NoError(t, node.Setup(testBinary, testConfig, "tok", false))
 
 	// test copied build file contents
-	obsBytes, err := ioutil.ReadFile(targetBuildFile)
+	buildOutputPath := path.Join(th.agentOptions.WorkingDirectory(), testBuildID)
+	obsBytes, err := ioutil.ReadFile(buildOutputPath)
 	require.NoError(t, err)
 	require.Equal(t, buildContents, obsBytes)
 
 	// test copied config file contents
-	obsBytes, err = ioutil.ReadFile(targetConfigFile)
+	configOutputPath := path.Join(th.agentOptions.WorkingDirectory(), testConfigID)
+	obsBytes, err = ioutil.ReadFile(configOutputPath)
 	require.NoError(t, err)
 	require.Equal(t, confContents, obsBytes)
 

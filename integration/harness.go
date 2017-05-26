@@ -51,7 +51,7 @@ type testHarness struct {
 	closers           []closeFn
 	t                 *testing.T
 	scriptNum         int
-	workingDir        string
+	harnessDir        string
 	iopts             instrument.Options
 	logger            xlog.Logger
 	agentListener     net.Listener
@@ -83,9 +83,9 @@ func newTestHarnessWithHearbeatOptions(t *testing.T, hbOpts node.HeartbeatOption
 		iopts:  instrument.NewOptions().SetLogger(logger),
 	}
 
-	th.workingDir = newTempDir(t)
+	th.harnessDir = newTempDir(t)
 	th.addCloser(func() error {
-		return os.RemoveAll(th.workingDir)
+		return os.RemoveAll(th.harnessDir)
 	})
 
 	// create agent listener
@@ -98,7 +98,7 @@ func newTestHarnessWithHearbeatOptions(t *testing.T, hbOpts node.HeartbeatOption
 
 	// create agent (service|server)
 	th.agentOptions = agent.NewOptions(th.iopts).
-		SetWorkingDirectory(th.workingDir).
+		SetWorkingDirectory(newSubDir(t, th.harnessDir, "agent-wd")).
 		SetExecGenFn(testExecGenFn)
 	service, err := agent.New(th.agentOptions)
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ func (th *testHarness) Close() error {
 }
 
 func (th *testHarness) newTempFile(contents []byte) *os.File {
-	file := newTempFile(th.t, th.workingDir, contents)
+	file := newTempFile(th.t, th.harnessDir, contents)
 	th.addCloser(func() error {
 		return os.Remove(file.Name())
 	})
@@ -193,7 +193,7 @@ func (th *testHarness) newTempFile(contents []byte) *os.File {
 func (th *testHarness) newTestScript(program testProgram) string {
 	sn := th.scriptNum
 	th.scriptNum++
-	file := newTestScript(th.t, th.workingDir, sn, program)
+	file := newTestScript(th.t, th.harnessDir, sn, program)
 	th.addCloser(func() error {
 		return os.Remove(file)
 	})

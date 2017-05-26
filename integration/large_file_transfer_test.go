@@ -41,16 +41,14 @@ func TestLargeFileTransfer(t *testing.T) {
 
 	// create test build
 	largeTestFileSize := int64(1024 * 1024 * 100) /* 100 MB */
-	largeTestFile := newLargeTempFile(t, th.workingDir, largeTestFileSize)
+	largeTestFile := newLargeTempFile(t, th.harnessDir, largeTestFileSize)
 	defer os.Remove(largeTestFile.Name())
 	testBuildID := "target-file.out"
-	targetBuildFile := path.Join(th.workingDir, testBuildID)
 	testBinary := build.NewServiceBuild(testBuildID, largeTestFile.Name())
 
 	// create test config
 	confContents := []byte("some longer string of text\nthat goes on, on and on\n")
 	testConfigID := "target-file.conf"
-	targetConfigFile := path.Join(th.workingDir, testConfigID)
 	testConfig := build.NewServiceConfig(testConfigID, confContents)
 
 	th.Start()
@@ -60,14 +58,16 @@ func TestLargeFileTransfer(t *testing.T) {
 	require.NoError(t, node.Setup(testBinary, testConfig, "tok", false))
 
 	// test copied build file contents
-	obsBytes, err := ioutil.ReadFile(targetBuildFile)
+	buildOutputPath := path.Join(th.agentOptions.WorkingDirectory(), testBuildID)
+	obsBytes, err := ioutil.ReadFile(buildOutputPath)
 	require.NoError(t, err)
 	// NB(prateek): not testing if bytes are equal as this is a large file,
 	// the operator <-> agent communication verifies checksum and num chunks
 	// sent are correct.
 
 	// test copied config file contents
-	obsBytes, err = ioutil.ReadFile(targetConfigFile)
+	configOutputPath := path.Join(th.agentOptions.WorkingDirectory(), testConfigID)
+	obsBytes, err = ioutil.ReadFile(configOutputPath)
 	require.NoError(t, err)
 	require.Equal(t, confContents, obsBytes)
 }

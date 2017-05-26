@@ -84,12 +84,12 @@ func TestProcessTermination(t *testing.T) {
 	require.NoError(t, svcNode.Stop())
 	time.Sleep(time.Second)
 
-	stderrFile := path.Join(th.workingDir, fmt.Sprintf("%s.err", testBuildID))
+	stderrFile := path.Join(th.agentOptions.WorkingDirectory(), fmt.Sprintf("%s.err", testBuildID))
 	stderrContents, err := ioutil.ReadFile(stderrFile)
 	require.NoError(t, err)
 	require.Equal(t, []byte{}, stderrContents, string(stderrContents))
 
-	stdoutFile := path.Join(th.workingDir, fmt.Sprintf("%s.out", testBuildID))
+	stdoutFile := path.Join(th.agentOptions.WorkingDirectory(), fmt.Sprintf("%s.out", testBuildID))
 	stdoutContents, err := ioutil.ReadFile(stdoutFile)
 	require.NoError(t, err)
 	require.Equal(t, []byte("testing random output"), stdoutContents)

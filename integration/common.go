@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -105,6 +106,13 @@ func newTempDir(t *testing.T) string {
 	path, err := ioutil.TempDir("", "integration-test")
 	require.NoError(t, err)
 	return path
+}
+
+func newSubDir(t *testing.T, dir, subdir string) string {
+	newPath := path.Join(dir, subdir)
+	err := os.Mkdir(newPath, os.FileMode(0755))
+	require.NoError(t, err)
+	return newPath
 }
 
 func newRandByteStream(t *testing.T, numBytes int64) []byte {

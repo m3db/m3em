@@ -320,12 +320,6 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 		o.processMonitor = nil
 	}
 
-	// remove any temporary resources stored in the working directory
-	wd := o.opts.WorkingDirectory()
-	o.logger.Infof("removing contents from working directory: %s", wd)
-	err := fs.RemoveContents(wd)
-	multiErr = multiErr.Add(err)
-
 	o.logger.Infof("releasing host resources")
 	if err := o.opts.ReleaseHostResourcesFn()(); err != nil {
 		o.logger.Infof("unable to release host resources: %v", err)
@@ -384,6 +378,14 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 		o.configPath = ""
 	}
 
+	// remove any temporary resources stored in the working directory
+	wd := o.opts.WorkingDirectory()
+	o.logger.Infof("removing contents from working directory: %s", wd)
+	if err := fs.RemoveContents(wd); err != nil {
+		return nil, grpc.Errorf(codes.Internal, "unable to clear working directory: %v", err)
+	}
+
+	// acquire any resources needed on the host
 	if err := o.opts.InitHostResourcesFn()(); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "unable to initialize host resources: %v", err)
 	}
