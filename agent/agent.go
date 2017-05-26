@@ -405,14 +405,14 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 	// setup new heartbeating
 	if request.HeartbeatEnabled {
-		beater, err := newHeartbeater(o, request.OperatorUuid, request.HeartbeatEndpoint, o.opts.InstrumentOptions())
+		o.heartbeatTimeoutCh = make(chan struct{})
+		beater, err := newHeartbeater(o, o.heartbeatTimeoutCh, request.OperatorUuid, request.HeartbeatEndpoint, o.opts.InstrumentOptions())
 		if err != nil {
 			o.resetWithLock() // release any resources
 			return nil, grpc.Errorf(codes.Aborted, "unable to start heartbeating process: %v", err)
 		}
 		o.heartbeater = beater
-		o.heartbeatTimeoutCh = make(chan struct{})
-		go o.monitorHeartbeatTimeout()
+		go o.monitorHeartbeatTimeout(o.heartbeatTimeoutCh)
 		o.heartbeater.start(time.Second * time.Duration(request.HeartbeatFrequencySecs))
 	}
 
@@ -420,8 +420,8 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 	return &m3em.SetupResponse{}, nil
 }
 
-func (o *opAgent) monitorHeartbeatTimeout() {
-	for range o.heartbeatTimeoutCh {
+func (o *opAgent) monitorHeartbeatTimeout(timeoutCh chan struct{}) {
+	for range timeoutCh {
 		o.logger.Warnf("heartbeat sending timed out, resetting agent")
 		o.Lock()
 		err := o.resetWithLock()
@@ -514,6 +514,7 @@ type opAgentHeartBeater struct {
 	agent             *opAgent
 	running           bool
 	wg                sync.WaitGroup
+	timeoutCh         chan struct{}
 	msgChan           chan heartbeatMsg
 	conn              *grpc.ClientConn
 	client            hb.HeartbeaterClient
@@ -525,6 +526,7 @@ type opAgentHeartBeater struct {
 
 func newHeartbeater(
 	agent *opAgent,
+	timeoutCh chan struct{},
 	opUUID string,
 	hbEndpoint string,
 	iopts instrument.Options,
@@ -537,6 +539,7 @@ func newHeartbeater(
 	return &opAgentHeartBeater{
 		iopts:             iopts,
 		agent:             agent,
+		timeoutCh:         timeoutCh,
 		msgChan:           make(chan heartbeatMsg),
 		conn:              conn,
 		client:            client,
@@ -627,7 +630,7 @@ func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
 	timeout := h.agent.opts.HeartbeatTimeout()
 	if timeSinceLastSend > timeout {
 		logger.Warnf("unable to send heartbeats for %s; timing out", timeSinceLastSend.String())
-		h.agent.heartbeatTimeoutCh <- struct{}{}
+		h.timeoutCh <- struct{}{}
 	}
 }
 
