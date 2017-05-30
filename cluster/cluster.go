@@ -110,8 +110,6 @@ func nodeSliceWithoutID(originalSlice node.ServiceNodes, removeID string) node.S
 	return newSlice
 }
 
-// TODO(prateek): reset initial placement after teardown
-
 func (c *svcCluster) newExecutor(
 	nodes node.ServiceNodes,
 	fn node.ServiceNodeFn,
