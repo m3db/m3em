@@ -51,7 +51,7 @@ func NewServiceBuild(id string, sourcePath string) ServiceBuild {
 
 type svcConfig struct {
 	id    string
-	bytes []byte // TODO(prateek): replace with YAML nested structure
+	bytes []byte
 }
 
 func (c *svcConfig) ID() string {
@@ -59,19 +59,15 @@ func (c *svcConfig) ID() string {
 }
 
 func (c *svcConfig) Iter(_ int) (fs.FileReaderIter, error) {
-	bytes, err := c.MarshalText()
+	bytes, err := c.Bytes()
 	if err != nil {
 		return nil, err
 	}
 	return fs.NewBytesReaderIter(bytes), nil
 }
 
-func (c *svcConfig) MarshalText() ([]byte, error) {
-	return c.bytes, nil // TODO(prateek): replace with yaml marshalling
-}
-
-func (c *svcConfig) UnmarshalText(b []byte) error {
-	panic("not implemented")
+func (c *svcConfig) Bytes() ([]byte, error) {
+	return c.bytes, nil
 }
 
 // NewServiceConfig returns a new Service Configuration

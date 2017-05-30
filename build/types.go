@@ -46,9 +46,6 @@ type ServiceBuild interface {
 type ServiceConfiguration interface {
 	IterableBytesWithID
 
-	// MarshalText returns a UTF-8 serialized representation of the service configuration
-	MarshalText() ([]byte, error)
-
-	// UnmarshalText deserializes the provided byte stream
-	UnmarshalText([]byte) error
+	// Bytes returns a UTF-8 serialized representation of the service configuration
+	Bytes() ([]byte, error)
 }

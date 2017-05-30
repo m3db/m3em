@@ -164,23 +164,13 @@ func (_mr *_MockServiceConfigurationRecorder) Iter(arg0 interface{}) *gomock.Cal
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Iter", arg0)
 }
 
-func (_m *MockServiceConfiguration) MarshalText() ([]byte, error) {
-	ret := _m.ctrl.Call(_m, "MarshalText")
+func (_m *MockServiceConfiguration) Bytes() ([]byte, error) {
+	ret := _m.ctrl.Call(_m, "Bytes")
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockServiceConfigurationRecorder) MarshalText() *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "MarshalText")
-}
-
-func (_m *MockServiceConfiguration) UnmarshalText(_param0 []byte) error {
-	ret := _m.ctrl.Call(_m, "UnmarshalText", _param0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-func (_mr *_MockServiceConfigurationRecorder) UnmarshalText(arg0 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "UnmarshalText", arg0)
+func (_mr *_MockServiceConfigurationRecorder) Bytes() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Bytes")
 }
