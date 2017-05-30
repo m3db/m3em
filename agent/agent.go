@@ -459,12 +459,12 @@ func (o *opAgent) initFile(
 		flags = flags | os.O_TRUNC
 	}
 
-	fileMode := os.FileMode(0644)
+	fileMode := o.opts.NewFileMode()
 	if fileType == m3em.FileType_SERVICE_BINARY {
 		fileMode = os.FileMode(0755)
 	}
 
-	dirMode := os.FileMode(0755)
+	dirMode := o.opts.NewDirectoryMode()
 	return newMultiWriter(paths, flags, fileMode, dirMode)
 }
 

@@ -22,6 +22,7 @@ package agent
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/m3db/m3em/os/exec"
@@ -31,7 +32,14 @@ import (
 )
 
 const (
+	// defaultHeartbeatTimeout is the default heartbeat timeout
 	defaultHeartbeatTimeout = 2 * time.Minute
+
+	// defaultNewFileMode is the file mode used for new files by default
+	defaultNewFileMode = os.FileMode(0666)
+
+	// defaultNewDirectoryMode is the file mode used for new directories by default
+	defaultNewDirectoryMode = os.ModeDir | os.FileMode(0755)
 )
 
 var (
@@ -49,6 +57,8 @@ type opts struct {
 	envMap           exec.EnvMap
 	heartbeatTimeout time.Duration
 	nowFn            xclock.NowFn
+	newFileMode      os.FileMode
+	newDirectoryMode os.FileMode
 }
 
 // NewOptions constructs new options
@@ -144,4 +154,22 @@ func (o *opts) SetNowFn(fn xclock.NowFn) Options {
 
 func (o *opts) NowFn() xclock.NowFn {
 	return o.nowFn
+}
+
+func (o *opts) SetNewFileMode(value os.FileMode) Options {
+	o.newFileMode = value
+	return o
+}
+
+func (o *opts) NewFileMode() os.FileMode {
+	return o.newFileMode
+}
+
+func (o *opts) SetNewDirectoryMode(value os.FileMode) Options {
+	o.newDirectoryMode = value
+	return o
+}
+
+func (o *opts) NewDirectoryMode() os.FileMode {
+	return o.newDirectoryMode
 }

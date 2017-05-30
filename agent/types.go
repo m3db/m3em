@@ -22,6 +22,7 @@ package agent
 
 import (
 	"io"
+	"os"
 	"time"
 
 	"github.com/m3db/m3em/generated/proto/m3em"
@@ -95,6 +96,18 @@ type Options interface {
 
 	// NowFn returns the now fn
 	NowFn() xclock.NowFn
+
+	// SetNewFileMode sets the new file mode
+	SetNewFileMode(value os.FileMode) Options
+
+	// NewFileMode returns the new file mode
+	NewFileMode() os.FileMode
+
+	// SetNewDirectoryMode sets the new directory mode
+	SetNewDirectoryMode(value os.FileMode) Options
+
+	// NewDirectoryMode returns the new directory mode
+	NewDirectoryMode() os.FileMode
 }
 
 // HostResourcesFn is used by the Agent to capture/release any resources
