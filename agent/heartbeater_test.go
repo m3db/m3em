@@ -67,7 +67,9 @@ func TestInvalidMessageType(t *testing.T) {
 	}
 	h.msgChan <- invalidMsg
 	time.Sleep(300 * time.Millisecond)
+	lock.Lock()
 	require.Error(t, recErr)
+	lock.Unlock()
 }
 
 type mockRunner struct{}

@@ -212,13 +212,15 @@ func TestTooManyFailedHeartbeatsStop(t *testing.T) {
 	rawAgent.executablePath = "someString"
 	rawAgent.configPath = "otherString"
 
-	pm.EXPECT().Start().Return(nil)
+	gomock.InOrder(
+		pm.EXPECT().Start().Return(nil),
+		pm.EXPECT().Stop().Return(nil),
+	)
+
 	startResp, err := rawAgent.Start(context.Background(), &m3em.StartRequest{})
 	require.NoError(t, err)
 	require.NotNil(t, startResp)
 	time.Sleep(time.Second)
-
-	pm.EXPECT().Stop().Return(nil)
 
 	// ensure agent has reset itself after timeout
 	time.Sleep(2 * opts.HeartbeatTimeout())
