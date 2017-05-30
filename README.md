@@ -20,9 +20,10 @@ There are two primary components in m3em:
 (2) `m3em_agent`: process running on remote hosts. It's responsible for process lifecycle, heartbeating back to the coordinating host.
 
 ## Usage Example
-- Refer `tools/dtest` in [M3DB](https://github.com/m3db/m3db)
+- For API usage, refer `tools/dtest` in [M3DB](https://github.com/m3db/m3db)
 
-## m3em_agent
+### m3em_agent
+
 ```
 $ make m3em_agent
 $ scp ./out/m3em_agent <remote-host>:<remote-path>
