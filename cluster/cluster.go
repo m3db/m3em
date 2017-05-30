@@ -152,8 +152,8 @@ func (c *svcCluster) initWithLock() error {
 			return err
 		}
 		if listener != nil {
+			// NB: no need to track returned listenerID here, it's cleaned up in node.Teardown()
 			node.RegisterListener(listener)
-			// TODO(prateek): track listenerID returned in cluster struct, cleanup in Teardown()
 		}
 		return nil
 	})
