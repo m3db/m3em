@@ -69,6 +69,8 @@ func NewOptions(io instrument.Options) Options {
 		releaseFn:        defaultNoErrorFn,
 		heartbeatTimeout: defaultHeartbeatTimeout,
 		nowFn:            time.Now,
+		newFileMode:      defaultNewFileMode,
+		newDirectoryMode: defaultNewDirectoryMode,
 	}
 }
 
