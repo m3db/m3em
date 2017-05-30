@@ -98,8 +98,8 @@ func New(
 		logger:              opts.InstrumentOptions().Logger(),
 		metrics:             newAgentMetrics(opts.InstrumentOptions().MetricsScope()),
 		newProcessMonitorFn: exec.NewProcessMonitor,
-		doneCh:              make(chan struct{}),
-		closeCh:             make(chan struct{}),
+		doneCh:              make(chan struct{}, 1),
+		closeCh:             make(chan struct{}, 1),
 	}
 	go agent.reportMetrics()
 	return agent, nil
