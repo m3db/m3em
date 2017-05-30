@@ -137,7 +137,7 @@ func newTestHarnessWithHearbeatOptions(t *testing.T, hbOpts node.HeartbeatOption
 		})
 
 		hbRouter := node.NewHeartbeatRouter(heartbeatListener.Addr().String())
-		hbServer := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+		hbServer := xgrpc.NewServer(nil)
 		hb.RegisterHeartbeaterServer(hbServer, hbRouter)
 		th.heartbeatServer = hbServer
 		th.addCloser(func() error {

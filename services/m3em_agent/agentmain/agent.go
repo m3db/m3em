@@ -34,6 +34,7 @@ import (
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 	m3emconfig "github.com/m3db/m3em/services/m3em_agent/config"
+	xgrpc "github.com/m3db/m3em/x/grpc"
 
 	"github.com/m3db/m3x/config"
 	"github.com/m3db/m3x/instrument"
@@ -41,7 +42,7 @@ import (
 	xtcp "github.com/m3db/m3x/tcp"
 	"github.com/pborman/getopt"
 	"github.com/uber-go/tally"
-	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 const (
@@ -106,7 +107,9 @@ func Run() {
 	if err != nil {
 		logger.Fatalf("unable to create agentService: %v", err)
 	}
-	server := grpc.NewServer(grpc.MaxConcurrentStreams(grpcMaxConcurrentStreams))
+
+	var serverCreds credentials.TransportCredentials // TODO(prateek): implement in config
+	server := xgrpc.NewServer(serverCreds)
 	m3em.RegisterOperatorServer(server, agentService)
 	logger.Infof("serving agent endpoints at %v", listener.Addr().String())
 	if err := server.Serve(listener); err != nil {
