@@ -44,6 +44,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	grpcMaxConcurrentStreams = 16384
+)
+
 // Run runs a m3em_agent process
 func Run() {
 	var (
@@ -102,7 +106,7 @@ func Run() {
 	if err != nil {
 		logger.Fatalf("unable to create agentService: %v", err)
 	}
-	server := grpc.NewServer(grpc.MaxConcurrentStreams(16384))
+	server := grpc.NewServer(grpc.MaxConcurrentStreams(grpcMaxConcurrentStreams))
 	m3em.RegisterOperatorServer(server, agentService)
 	logger.Infof("serving agent endpoints at %v", listener.Addr().String())
 	if err := server.Serve(listener); err != nil {
