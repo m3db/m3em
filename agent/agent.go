@@ -22,7 +22,6 @@ package agent
 
 import (
 	"fmt"
-	"hash/crc32"
 	"io"
 	"io/ioutil"
 	"os"
@@ -32,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/m3db/m3em/checksum"
 	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
@@ -490,7 +490,7 @@ func (o *opAgent) markFileDone(
 func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 	o.logger.Infof("received Transfer()")
 	var (
-		checksum     = uint32(0)
+		checksum     = checksum.NewAccumulator()
 		numChunks    = 0
 		lastChunkIdx = int32(0)
 		fileHandle   *multiWriter
@@ -529,7 +529,7 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 
 		numChunks++
 		bytes := request.GetData().GetBytes()
-		checksum = crc32.Update(checksum, crc32.IEEETable, bytes)
+		checksum.Update(bytes)
 
 		numWritten, err := fileHandle.write(bytes)
 		if err != nil {
@@ -557,7 +557,7 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 	}
 
 	return stream.SendAndClose(&m3em.TransferResponse{
-		FileChecksum:   checksum,
+		FileChecksum:   checksum.Current(),
 		NumChunksRecvd: int32(numChunks),
 	})
 }

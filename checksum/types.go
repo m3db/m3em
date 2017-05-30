@@ -18,45 +18,42 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package fs
+package checksum
 
 import (
-	"github.com/m3db/m3em/checksum"
+	"hash/crc32"
 )
 
-type bytesReaderIter struct {
-	bytes []byte
-	count int
+// Fn returns a checksum of the provided bytes
+func Fn(b []byte) uint32 {
+	return crc32.ChecksumIEEE(b)
 }
 
-// NewBytesReaderIter creates a new FileReaderIter to iterate
-// over a fixed byte slice.
-func NewBytesReaderIter(bytes []byte) FileReaderIter {
-	return &bytesReaderIter{
-		bytes: bytes,
+// Accumulator accrues checksums
+type Accumulator interface {
+	// Current returns the current checksum value
+	Current() uint32
+
+	// Update updates accrued checksum using provided bytes
+	Update(b []byte) uint32
+}
+
+// NewAccumulator returns a new accumulator
+func NewAccumulator() Accumulator {
+	return &accum{
+		checksum: 0,
 	}
 }
 
-func (b *bytesReaderIter) Current() []byte {
-	if b.count == 1 {
-		return b.bytes
-	}
-	return nil
+type accum struct {
+	checksum uint32
 }
 
-func (b *bytesReaderIter) Next() bool {
-	b.count++
-	return b.count == 1
+func (a *accum) Current() uint32 {
+	return a.checksum
 }
 
-func (b *bytesReaderIter) Err() error {
-	return nil
-}
-
-func (b *bytesReaderIter) Checksum() uint32 {
-	return checksum.Fn(b.bytes)
-}
-
-func (b *bytesReaderIter) Close() error {
-	return nil
+func (a *accum) Update(b []byte) uint32 {
+	a.checksum = crc32.Update(a.checksum, crc32.IEEETable, b)
+	return a.checksum
 }

@@ -21,10 +21,10 @@
 package fs
 
 import (
-	"hash/crc32"
 	"os"
 	"testing"
 
+	"github.com/m3db/m3em/checksum"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,7 +48,7 @@ func TestIterChecksumLargeBuffer(t *testing.T) {
 	require.Equal(t, 2, numIter) // once for all the data, once for returning done
 	require.NoError(t, iter.Err())
 	require.Equal(t, content, returnedBytes)
-	require.Equal(t, crc32.ChecksumIEEE(content), iter.Checksum())
+	require.Equal(t, checksum.Fn(content), iter.Checksum())
 	require.Nil(t, iter.(*bufferedFileReaderIter).fileHandle)
 }
 
@@ -73,6 +73,6 @@ func TestIterChecksumSmallBuffer(t *testing.T) {
 	require.Equal(t, numExpectedIter, numIter)
 	require.NoError(t, iter.Err())
 	require.Equal(t, content, returnedBytes)
-	require.Equal(t, crc32.ChecksumIEEE(content), iter.Checksum())
+	require.Equal(t, checksum.Fn(content), iter.Checksum())
 	require.Nil(t, iter.(*bufferedFileReaderIter).fileHandle)
 }

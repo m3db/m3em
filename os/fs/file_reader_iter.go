@@ -22,9 +22,10 @@ package fs
 
 import (
 	"bufio"
-	"hash/crc32"
 	"io"
 	"os"
+
+	"github.com/m3db/m3em/checksum"
 )
 
 const (
@@ -32,14 +33,13 @@ const (
 )
 
 type bufferedFileReaderIter struct {
-	currentBytes    []byte
-	currentChecksum uint32
-	bufferedReader  *bufio.Reader
-	checksumTable   *crc32.Table
-	fileHandle      *os.File
-	err             error
-	done            bool
-	init            bool
+	currentBytes   []byte
+	checksum       checksum.Accumulator
+	bufferedReader *bufio.Reader
+	fileHandle     *os.File
+	err            error
+	done           bool
+	init           bool
 }
 
 // NewFileReaderIter creates a new buffered FileReaderIter
@@ -59,14 +59,13 @@ func NewSizedFileReaderIter(
 		return nil, err
 	}
 	var (
-		bytes         = make([]byte, bufferSize)
-		buffReader    = bufio.NewReaderSize(fhandle, bufferSize)
-		checksumTable = crc32.IEEETable
-		iter          = &bufferedFileReaderIter{
-			fileHandle:     fhandle,
+		bytes      = make([]byte, bufferSize)
+		buffReader = bufio.NewReaderSize(fhandle, bufferSize)
+		iter       = &bufferedFileReaderIter{
 			currentBytes:   bytes,
+			checksum:       checksum.NewAccumulator(),
 			bufferedReader: buffReader,
-			checksumTable:  checksumTable,
+			fileHandle:     fhandle,
 		}
 	)
 	return iter, nil
@@ -97,7 +96,7 @@ func (r *bufferedFileReaderIter) Next() bool {
 	}
 
 	bytes := r.currentBytes[:n]
-	r.currentChecksum = crc32.Update(r.currentChecksum, r.checksumTable, bytes)
+	r.checksum.Update(bytes)
 	r.currentBytes = bytes
 	if err == io.EOF {
 		r.done = true
@@ -119,7 +118,7 @@ func (r *bufferedFileReaderIter) Close() error {
 }
 
 func (r *bufferedFileReaderIter) Checksum() uint32 {
-	return r.currentChecksum
+	return r.checksum.Current()
 }
 
 func (r *bufferedFileReaderIter) Err() error {
