@@ -37,8 +37,6 @@ import (
 	"github.com/m3db/m3em/os/exec"
 	"github.com/m3db/m3em/os/fs"
 
-	"path/filepath"
-
 	xclock "github.com/m3db/m3x/clock"
 	xerrors "github.com/m3db/m3x/errors"
 	"github.com/m3db/m3x/instrument"
@@ -147,10 +145,10 @@ func (o *opAgent) reportMetrics() {
 	for {
 		select {
 		case <-reportTicker.C:
-			running, exec, conf := o.state()
-			updateBoolGauge(running, o.metrics.running)
-			updateBoolGauge(exec != "", o.metrics.execTransferred)
-			updateBoolGauge(conf != "", o.metrics.confTransferred)
+			state := o.state()
+			updateBoolGauge(state.running, o.metrics.running)
+			updateBoolGauge(state.executablePath != "", o.metrics.execTransferred)
+			updateBoolGauge(state.configPath != "", o.metrics.confTransferred)
 		case <-o.closeCh:
 			reportTicker.Stop()
 			o.doneCh <- struct{}{}
@@ -163,10 +161,20 @@ func (o *opAgent) Running() bool {
 	return atomic.LoadInt32(&o.running) == 1
 }
 
-func (o *opAgent) state() (bool, string, string) {
+type opAgentState struct {
+	running        bool
+	executablePath string
+	configPath     string
+}
+
+func (o *opAgent) state() opAgentState {
 	o.RLock()
 	defer o.RUnlock()
-	return o.Running(), o.executablePath, o.configPath
+	return opAgentState{
+		running:        o.Running(),
+		executablePath: o.executablePath,
+		configPath:     o.configPath,
+	}
 }
 
 func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.StartResponse, error) {
@@ -193,28 +201,25 @@ func (o *opAgent) Start(ctx context.Context, request *m3em.StartRequest) (*m3em.
 	return &m3em.StartResponse{}, nil
 }
 
-func (o *opAgent) newListenerFn() func(error) {
-	return func(err error) {
-		if err == nil {
-			err = fmt.Errorf("test process terminated without error")
-		} else {
-			err = fmt.Errorf("test process terminated with error: %v", err)
-		}
-		o.logger.Warnf("%v", err)
-		if stopping := atomic.LoadInt32(&o.stopping); stopping == 0 && o.heartbeater != nil {
-			o.heartbeater.notifyProcessTermination(err)
-		}
-		atomic.StoreInt32(&o.running, 0)
+func (o *opAgent) onProcessTerminate(err error) {
+	if err == nil {
+		err = fmt.Errorf("test process terminated without error")
+	} else {
+		err = fmt.Errorf("test process terminated with error: %v", err)
 	}
+	o.logger.Warnf("%v", err)
+	if stopping := atomic.LoadInt32(&o.stopping); stopping == 0 && o.heartbeater != nil {
+		o.heartbeater.notifyProcessTermination(err)
+	}
+	atomic.StoreInt32(&o.running, 0)
 }
 
 func (o *opAgent) newProcessListener() exec.ProcessListener {
-	var (
-		listenFn   = o.newListenerFn()
-		onComplete = func() { listenFn(nil) }
-		onError    = func(err error) { listenFn(err) }
-	)
-	return exec.NewProcessListener(onComplete, onError)
+	return exec.NewProcessListener(func() {
+		o.onProcessTerminate(nil)
+	}, func(err error) {
+		o.onProcessTerminate(err)
+	})
 }
 
 func (o *opAgent) startWithLock() error {
@@ -336,7 +341,7 @@ func (o *opAgent) isSetupWithLock() bool {
 }
 
 func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.SetupResponse, error) {
-	o.logger.Infof("receieved Setup()")
+	o.logger.Infof("received Setup()")
 
 	// nil check
 	if request == nil || request.SessionToken == "" {
@@ -390,91 +395,23 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 }
 
 func (o *opAgent) monitorHeartbeatTimeout(timeoutCh chan struct{}) {
-	for range timeoutCh {
-		o.logger.Warnf("heartbeat sending timed out, resetting agent")
-		o.Lock()
-		err := o.resetWithLock(nil) // nil indicates we don't want to send a heartbeat
-		o.Unlock()
-		if err == nil {
-			o.logger.Infof("successfully reset agent")
-		} else {
-			o.logger.Warnf("error while resetting agent: %v", err)
-		}
-		// resetting breaks out of the loop as it closes the timeoutCh
+	_, open := <-timeoutCh
+
+	// organically closed, not a timeout
+	if !open {
+		return
 	}
-}
 
-// non-thread safe multi-writer
-type multiWriter struct {
-	io.Closer
-	fds []*os.File
-}
-
-// based on signature of os.OpenFile
-func newMulitWriter(paths []string, flags int, fileMode os.FileMode, dirMode os.FileMode) (*multiWriter, error) {
-	mw := &multiWriter{}
-	for _, p := range paths {
-		// ensure directory exists
-		dir := filepath.Dir(p)
-		err := os.MkdirAll(dir, dirMode)
-		if err != nil {
-			mw.Close() // cleanup
-			return nil, err
-		}
-
-		// create file
-		fd, err := os.OpenFile(p, flags, fileMode)
-		if err != nil {
-			mw.Close() // cleanup
-			return nil, err
-		}
-		mw.fds = append(mw.fds, fd)
+	// timed out, resetting
+	o.logger.Warnf("heartbeat sending timed out, resetting agent")
+	o.Lock()
+	err := o.resetWithLock(nil) // nil indicates we don't want to send a heartbeat
+	o.Unlock()
+	if err == nil {
+		o.logger.Infof("successfully reset agent")
+	} else {
+		o.logger.Warnf("error while resetting agent: %v", err)
 	}
-	return mw, nil
-}
-
-// mimics signature of os.File.Write
-func (mw *multiWriter) write(b []byte) (int, error) {
-	var (
-		first = true
-		n     int
-		err   error
-	)
-
-	// write the provided data to all fds, terminating
-	// early if any fd write fails or is not the same
-	// as the others
-	for _, fd := range mw.fds {
-		// initialize for the first fd
-		if first {
-			n, err = fd.Write(b)
-			first = false
-			if err != nil {
-				return n, err
-			}
-			continue
-		}
-
-		// for the rest of the fds, ensure
-		// they all write the same number of bytes
-		// as the first one
-		ni, err := fd.Write(b)
-		if err != nil {
-			return n, err
-		}
-		if ni != n {
-			return 0, fmt.Errorf("unable to write same data to all fds")
-		}
-	}
-	return n, nil
-}
-
-func (mw *multiWriter) Close() error {
-	var me xerrors.MultiError
-	for _, fd := range mw.fds {
-		me = me.Add(fd.Close())
-	}
-	return me.FinalError()
 }
 
 func (o *opAgent) pathsRelativeToWorkingDir(
@@ -520,7 +457,7 @@ func (o *opAgent) initFile(
 	}
 
 	dirMode := os.FileMode(0755)
-	return newMulitWriter(paths, flags, fileMode, dirMode)
+	return newMultiWriter(paths, flags, fileMode, dirMode)
 }
 
 func (o *opAgent) markFileDone(
@@ -551,7 +488,7 @@ func (o *opAgent) markFileDone(
 }
 
 func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
-	o.logger.Infof("receieved Transfer()")
+	o.logger.Infof("received Transfer()")
 	var (
 		checksum     = uint32(0)
 		numChunks    = 0
@@ -561,28 +498,6 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		err          error
 	)
 
-	defer func() {
-		if fileHandle != nil {
-			fileHandle.Close()
-		}
-	}()
-
-	doneFn := func(mw *multiWriter, ft m3em.FileType, cks uint32, numChunks int) error {
-		var me xerrors.MultiError
-		if mw == nil {
-			return fmt.Errorf("multiwriter has not been initialized")
-		}
-		me = me.Add(o.markFileDone(ft, mw))
-		if err := me.FinalError(); err != nil {
-			me = me.Add(fmt.Errorf("unable to mark file done: %v", err))
-			return me.FinalError()
-		}
-		return stream.SendAndClose(&m3em.TransferResponse{
-			FileChecksum:   cks,
-			NumChunksRecvd: int32(numChunks),
-		})
-	}
-
 	for {
 		request, streamErr := stream.Recv()
 		if streamErr != nil && streamErr != io.EOF {
@@ -590,7 +505,7 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 
 		if request == nil {
-			return doneFn(fileHandle, fileType, checksum, numChunks)
+			break
 		}
 
 		if numChunks == 0 {
@@ -626,9 +541,25 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		}
 
 		if streamErr == io.EOF {
-			return doneFn(fileHandle, fileType, checksum, numChunks)
+			break
 		}
 	}
+
+	if fileHandle == nil {
+		return fmt.Errorf("multiwriter has not been initialized")
+	}
+
+	var me xerrors.MultiError
+	me = me.Add(fileHandle.Close())
+	me = me.Add(o.markFileDone(fileType, fileHandle))
+	if err := me.FinalError(); err != nil {
+		return err
+	}
+
+	return stream.SendAndClose(&m3em.TransferResponse{
+		FileChecksum:   checksum,
+		NumChunksRecvd: int32(numChunks),
+	})
 }
 
 type opAgentHeartBeater struct {
