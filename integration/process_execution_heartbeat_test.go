@@ -89,6 +89,7 @@ func TestProcessExecutionHeartbeating(t *testing.T) {
 	require.True(t, stopped)
 
 	// ensure we were notified of exit
+	time.Sleep(time.Second)
 	require.True(t, notifiedTermination)
 	th.logger.Infof("received termination heartbeat in operator")
 

@@ -32,14 +32,11 @@ import (
 	"time"
 
 	"github.com/m3db/m3em/checksum"
-	hb "github.com/m3db/m3em/generated/proto/heartbeat"
 	"github.com/m3db/m3em/generated/proto/m3em"
 	"github.com/m3db/m3em/os/exec"
 	"github.com/m3db/m3em/os/fs"
 
-	xclock "github.com/m3db/m3x/clock"
 	xerrors "github.com/m3db/m3x/errors"
-	"github.com/m3db/m3x/instrument"
 	xlog "github.com/m3db/m3x/log"
 	"github.com/uber-go/tally"
 	context "golang.org/x/net/context"
@@ -69,7 +66,7 @@ type opAgent struct {
 	configPath          string
 	newProcessMonitorFn newProcessMonitorFn
 	processMonitor      exec.ProcessMonitor
-	heartbeater         *opAgentHeartBeater
+	heartbeater         *heatbeater
 
 	running            int32
 	stopping           int32
@@ -379,14 +376,20 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 	// setup new heartbeating
 	if request.HeartbeatEnabled {
-		o.heartbeatTimeoutCh = make(chan struct{})
-		beater, err := newHeartbeater(o, o.heartbeatTimeoutCh, request.OperatorUuid, request.HeartbeatEndpoint, o.opts.InstrumentOptions())
+		opts := heartbeatOpts{
+			operatorUUID: request.OperatorUuid,
+			endpoint:     request.HeartbeatEndpoint,
+			nowFn:        o.opts.NowFn(),
+			timeout:      o.opts.HeartbeatTimeout(),
+			timeoutFn:    o.heartbeatingTimeout,
+			errorFn:      o.heartbeatInternalError,
+		}
+		beater, err := newHeartbeater(o, opts, o.opts.InstrumentOptions())
 		if err != nil {
 			o.resetWithLock(errSetupInitializeHostResources) // release any resources
 			return nil, grpc.Errorf(codes.Aborted, "unable to start heartbeating process: %v", err)
 		}
 		o.heartbeater = beater
-		go o.monitorHeartbeatTimeout(o.heartbeatTimeoutCh)
 		o.heartbeater.start(time.Second * time.Duration(request.HeartbeatFrequencySecs))
 	}
 
@@ -394,18 +397,23 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 	return &m3em.SetupResponse{}, nil
 }
 
-func (o *opAgent) monitorHeartbeatTimeout(timeoutCh chan struct{}) {
-	_, open := <-timeoutCh
-
-	// organically closed, not a timeout
-	if !open {
-		return
-	}
-
-	// timed out, resetting
+func (o *opAgent) heartbeatingTimeout(lastHb time.Time) {
 	o.logger.Warnf("heartbeat sending timed out, resetting agent")
 	o.Lock()
 	err := o.resetWithLock(nil) // nil indicates we don't want to send a heartbeat
+	o.Unlock()
+	if err == nil {
+		o.logger.Infof("successfully reset agent")
+	} else {
+		o.logger.Warnf("error while resetting agent: %v", err)
+	}
+}
+
+func (o *opAgent) heartbeatInternalError(err error) {
+	o.logger.Warnf("received unknown error whilst heartbeat, err=%v", err)
+	o.logger.Warnf("resetting agent")
+	o.Lock()
+	err = o.resetWithLock(err)
 	o.Unlock()
 	if err == nil {
 		o.logger.Infof("successfully reset agent")
@@ -560,183 +568,6 @@ func (o *opAgent) Transfer(stream m3em.Operator_TransferServer) error {
 		FileChecksum:   checksum.Current(),
 		NumChunksRecvd: int32(numChunks),
 	})
-}
-
-type opAgentHeartBeater struct {
-	sync.RWMutex
-	iopts             instrument.Options
-	agent             *opAgent
-	running           bool
-	wg                sync.WaitGroup
-	timeoutCh         chan struct{}
-	msgChan           chan heartbeatMsg
-	conn              *grpc.ClientConn
-	client            hb.HeartbeaterClient
-	operatorUUID      string
-	heartbeatEndpoint string
-	lastHeartbeatTs   time.Time
-	nowFn             xclock.NowFn
-}
-
-func newHeartbeater(
-	agent *opAgent,
-	timeoutCh chan struct{},
-	opUUID string,
-	hbEndpoint string,
-	iopts instrument.Options,
-) (*opAgentHeartBeater, error) {
-	conn, err := grpc.Dial(hbEndpoint, grpc.WithTimeout(defaultHeartbeatConnTimeout), grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	client := hb.NewHeartbeaterClient(conn)
-	return &opAgentHeartBeater{
-		iopts:             iopts,
-		agent:             agent,
-		timeoutCh:         timeoutCh,
-		msgChan:           make(chan heartbeatMsg),
-		conn:              conn,
-		client:            client,
-		operatorUUID:      opUUID,
-		heartbeatEndpoint: hbEndpoint,
-		nowFn:             agent.opts.NowFn(),
-	}, nil
-}
-
-func (h *opAgentHeartBeater) isRunning() bool {
-	h.RLock()
-	defer h.RUnlock()
-	return h.running
-}
-
-func (h *opAgentHeartBeater) defaultHeartbeat() hb.HeartbeatRequest {
-	h.RLock()
-	req := hb.HeartbeatRequest{
-		OperatorUuid:   h.operatorUUID,
-		ProcessRunning: h.agent.Running(),
-	}
-	h.RUnlock()
-	return req
-}
-
-func (h *opAgentHeartBeater) start(d time.Duration) {
-	h.Lock()
-	h.running = true
-	h.Unlock()
-	h.wg.Add(1)
-	go h.heartbeatLoop(d)
-}
-
-func (h *opAgentHeartBeater) sendHealthyHeartbeat() {
-	beat := h.defaultHeartbeat()
-	beat.Code = hb.HeartbeatCode_HEALTHY
-	h.sendHeartbeat(&beat)
-}
-
-func (h *opAgentHeartBeater) heartbeatLoop(d time.Duration) {
-	defer func() {
-		h.Lock()
-		h.running = false
-		h.Unlock()
-		h.wg.Done()
-	}()
-
-	// explicitly send first heartbeat as soon as we start
-	h.sendHealthyHeartbeat()
-
-	for {
-		select {
-		case msg := <-h.msgChan:
-			if msg.stop {
-				return
-			}
-			beat := h.defaultHeartbeat()
-			msg.toRPCType(&beat)
-			h.sendHeartbeat(&beat)
-
-		default:
-			h.sendHealthyHeartbeat()
-			// NB(prateek): we use a sleep instead of a ticker because the latter
-			// only guarantees a lower bound on the frequency of ticks, it does not
-			// guarantee any upper bound. This makes it impossible to reliably detect
-			// heartbeating timeouts.
-			time.Sleep(d)
-		}
-	}
-}
-
-func (h *opAgentHeartBeater) sendHeartbeat(r *hb.HeartbeatRequest) {
-	h.Lock()
-	defer h.Unlock()
-
-	logger := h.iopts.Logger()
-	_, err := h.client.Heartbeat(context.Background(), r)
-
-	// always mark the first send attempt as success to get a base time to compare against
-	if err == nil || h.lastHeartbeatTs.IsZero() {
-		h.lastHeartbeatTs = h.nowFn()
-		return
-	}
-
-	logger.Warnf("unable to send heartbeat: %v", err)
-	// check if this has been happening for past the permitted period
-	timeSinceLastSend := h.nowFn().Sub(h.lastHeartbeatTs)
-	timeout := h.agent.opts.HeartbeatTimeout()
-	if timeSinceLastSend > timeout {
-		logger.Warnf("unable to send heartbeats for %s; timing out", timeSinceLastSend.String())
-		h.timeoutCh <- struct{}{}
-	}
-}
-
-func (h *opAgentHeartBeater) stop() {
-	if h.isRunning() {
-		h.msgChan <- heartbeatMsg{stop: true}
-		h.wg.Wait()
-	}
-}
-
-func (h *opAgentHeartBeater) close() error {
-	h.stop()
-	var err error
-	if h.conn != nil {
-		err = h.conn.Close()
-		h.conn = nil
-	}
-	return err
-}
-
-func (h *opAgentHeartBeater) notifyProcessTermination(err error) {
-	h.msgChan <- heartbeatMsg{
-		processTerminate: true,
-		err:              err,
-	}
-}
-
-func (h *opAgentHeartBeater) notifyOverwrite(err error) {
-	h.msgChan <- heartbeatMsg{
-		overwritten: true,
-		err:         err,
-	}
-}
-
-type heartbeatMsg struct {
-	stop             bool
-	processTerminate bool
-	overwritten      bool
-	err              error
-}
-
-func (hm heartbeatMsg) toRPCType(req *hb.HeartbeatRequest) {
-	if hm.processTerminate {
-		req.Code = hb.HeartbeatCode_PROCESS_TERMINATION
-		req.Error = hm.err.Error()
-	} else if hm.overwritten {
-		req.Code = hb.HeartbeatCode_OVERWRITTEN
-		req.Error = hm.err.Error()
-	} else {
-		// should never happen
-		req.Code = hb.HeartbeatCode_UNKNOWN
-	}
 }
 
 type opAgentMetrics struct {

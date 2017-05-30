@@ -97,9 +97,9 @@ func (hr *heartbeatRouter) Heartbeat(
 	return server.Heartbeat(ctx, msg)
 }
 
-// Heartbeating from agent -> operator: this is to ensure capture of asynchronous
-// error conditions, e.g. the child process kicked off by the agent dies, but the
-// operator is not informed.
+// Receive heartbeats from remote agent: this is to ensure capture of asynchronous
+// error conditions, e.g. when a child process kicked off by the agent dies, the
+// associated ServiceNode is informed of the crash.
 type opHeartbeatServer struct {
 	sync.RWMutex
 	opts            HeartbeatOptions
@@ -189,10 +189,8 @@ func (h *opHeartbeatServer) monitorTimeout() {
 				h.listeners.notifyTimeout(last)
 				lastNotificationTs = last
 			}
-			// NB(prateek): we use a sleep instead of a ticker because the latter
-			// only guarantees a lower bound on the frequency of ticks, it does not
-			// guarantee any upper bound. This makes it impossible to reliably detect
-			// heartbeating timeouts.
+			// NB(prateek): we use a sleep instead of a ticker because we've observed emperically
+			// the former reschedules go-routines with lower delays.
 			time.Sleep(checkInterval)
 		}
 	}
