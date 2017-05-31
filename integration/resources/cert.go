@@ -23,8 +23,9 @@
 package resources
 
 import (
-	"crypto/tls"
 	"crypto/x509"
+
+	xgrpc "github.com/m3db/m3em/x/grpc"
 
 	"google.golang.org/grpc/credentials"
 )
@@ -53,6 +54,11 @@ func caCertificate() (*x509.CertPool, error) {
 
 // ClientTransportCredentials return a DialOption for TLS Client communication
 func ClientTransportCredentials() (credentials.TransportCredentials, error) {
+	caCrt, err := Asset(caCrtResource)
+	if err != nil {
+		return nil, err
+	}
+
 	clientCrt, err := Asset(clientCrtResources)
 	if err != nil {
 		return nil, err
@@ -63,49 +69,25 @@ func ClientTransportCredentials() (credentials.TransportCredentials, error) {
 		return nil, err
 	}
 
-	certificate, err := tls.X509KeyPair(clientCrt, clientKey)
-	if err != nil {
-		return nil, err
-	}
-
-	caCert, err := caCertificate()
-	if err != nil {
-		return nil, err
-	}
-
-	return credentials.NewTLS(&tls.Config{
-		ServerName:   serverName,
-		Certificates: []tls.Certificate{certificate},
-		RootCAs:      caCert,
-	}), nil
-
+	return xgrpc.NewClientCredentials(serverName, caCrt, clientCrt, clientKey)
 }
 
 // ServerTransportCredentials return a DialOption for TLS Server communication
 func ServerTransportCredentials() (credentials.TransportCredentials, error) {
+	caCrt, err := Asset(caCrtResource)
+	if err != nil {
+		return nil, err
+	}
+
 	serverCrt, err := Asset(serverCrtResources)
 	if err != nil {
 		return nil, err
 	}
+
 	serverKey, err := Asset(serverKeyResources)
 	if err != nil {
 		return nil, err
 	}
-	certificate, err := tls.X509KeyPair(serverCrt, serverKey)
-	if err != nil {
-		return nil, err
-	}
 
-	caCert, err := caCertificate()
-	if err != nil {
-		return nil, err
-	}
-
-	tlsConfig := &tls.Config{
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{certificate},
-		ClientCAs:    caCert,
-	}
-
-	return credentials.NewTLS(tlsConfig), nil
+	return xgrpc.NewServerCredentials(caCrt, serverCrt, serverKey)
 }

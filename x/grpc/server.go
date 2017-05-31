@@ -21,6 +21,10 @@
 package xgrpc
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -44,4 +48,55 @@ func options(tCred credentials.TransportCredentials) []grpc.ServerOption {
 // NewServer returns a new grpc Server with provided options
 func NewServer(tc credentials.TransportCredentials) *grpc.Server {
 	return grpc.NewServer(options(tc)...)
+}
+
+// NewServerCredentials returns Server Credentials
+func NewServerCredentials(
+	caCertPEMBlock []byte,
+	serverCertPEMBlock []byte,
+	serverKeyPEMBlock []byte,
+) (credentials.TransportCredentials, error) {
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM(caCertPEMBlock)
+	if !ok {
+		return nil, fmt.Errorf("unable to append CA Cert")
+	}
+
+	certificate, err := tls.X509KeyPair(serverCertPEMBlock, serverKeyPEMBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig := &tls.Config{
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{certificate},
+		ClientCAs:    certPool,
+	}
+	return credentials.NewTLS(tlsConfig), nil
+}
+
+// NewClientCredentials returns Client Credentials
+func NewClientCredentials(
+	serverName string,
+	caCertPEMBlock []byte,
+	clientCertPEMBlock []byte,
+	clientKeyPEMBlock []byte,
+) (credentials.TransportCredentials, error) {
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM(caCertPEMBlock)
+	if !ok {
+		return nil, fmt.Errorf("unable to append CA Cert")
+	}
+
+	certificate, err := tls.X509KeyPair(clientCertPEMBlock, clientKeyPEMBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig := &tls.Config{
+		ServerName:   serverName,
+		Certificates: []tls.Certificate{certificate},
+		RootCAs:      certPool,
+	}
+	return credentials.NewTLS(tlsConfig), nil
 }
