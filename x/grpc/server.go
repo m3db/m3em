@@ -56,20 +56,14 @@ func NewServerCredentials(
 	serverCertPEMBlock []byte,
 	serverKeyPEMBlock []byte,
 ) (credentials.TransportCredentials, error) {
-	certPool := x509.NewCertPool()
-	ok := certPool.AppendCertsFromPEM(caCertPEMBlock)
-	if !ok {
-		return nil, fmt.Errorf("unable to append CA Cert")
-	}
-
-	certificate, err := tls.X509KeyPair(serverCertPEMBlock, serverKeyPEMBlock)
+	certPool, certificate, err := newCert(caCertPEMBlock, serverCertPEMBlock, serverKeyPEMBlock)
 	if err != nil {
 		return nil, err
 	}
 
 	tlsConfig := &tls.Config{
 		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{certificate},
+		Certificates: []tls.Certificate{*certificate},
 		ClientCAs:    certPool,
 	}
 	return credentials.NewTLS(tlsConfig), nil
@@ -82,21 +76,34 @@ func NewClientCredentials(
 	clientCertPEMBlock []byte,
 	clientKeyPEMBlock []byte,
 ) (credentials.TransportCredentials, error) {
-	certPool := x509.NewCertPool()
-	ok := certPool.AppendCertsFromPEM(caCertPEMBlock)
-	if !ok {
-		return nil, fmt.Errorf("unable to append CA Cert")
-	}
-
-	certificate, err := tls.X509KeyPair(clientCertPEMBlock, clientKeyPEMBlock)
+	certPool, certificate, err := newCert(caCertPEMBlock, clientCertPEMBlock, clientKeyPEMBlock)
 	if err != nil {
 		return nil, err
 	}
 
 	tlsConfig := &tls.Config{
 		ServerName:   serverName,
-		Certificates: []tls.Certificate{certificate},
+		Certificates: []tls.Certificate{*certificate},
 		RootCAs:      certPool,
 	}
 	return credentials.NewTLS(tlsConfig), nil
+}
+
+func newCert(
+	caCertPEMBlock []byte,
+	certPEMBlock []byte,
+	keyPEMBlock []byte,
+) (*x509.CertPool, *tls.Certificate, error) {
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM(caCertPEMBlock)
+	if !ok {
+		return nil, nil, fmt.Errorf("unable to append CA Cert")
+	}
+
+	certificate, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return certPool, &certificate, nil
 }
