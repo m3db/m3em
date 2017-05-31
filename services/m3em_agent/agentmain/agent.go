@@ -108,7 +108,14 @@ func Run() {
 		logger.Fatalf("unable to create agentService: %v", err)
 	}
 
-	var serverCreds credentials.TransportCredentials // TODO(prateek): implement in config
+	var serverCreds credentials.TransportCredentials
+	if tls := conf.Server.TLS; tls != nil {
+		logger.Infof("using provided TLS config: %+v", tls)
+		serverCreds, err = tls.Credentials()
+		if err != nil {
+			logger.Fatalf("unable to create transport credentials: %v", err)
+		}
+	}
 	server := xgrpc.NewServer(serverCreds)
 	m3em.RegisterOperatorServer(server, agentService)
 	logger.Infof("serving agent endpoints at %v", listener.Addr().String())
