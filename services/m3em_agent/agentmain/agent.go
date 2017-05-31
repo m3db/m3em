@@ -45,10 +45,6 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-const (
-	grpcMaxConcurrentStreams = 16384
-)
-
 // Run runs a m3em_agent process
 func Run() {
 	var (
