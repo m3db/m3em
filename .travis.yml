@@ -6,7 +6,6 @@ env:
   global:
     - TEST_TIMEOUT_SCALE=20 # Set higher timeouts for Travis
     - PACKAGE=github.com/$TRAVIS_REPO_SLUG
-    - TEST_TLS_COMMUNICATION=true
 sudo: required
 dist: trusty
 script:
