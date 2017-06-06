@@ -131,15 +131,16 @@ func (h *heatbeater) heartbeatLoop(d time.Duration) {
 		select {
 		case msg := <-h.msgChan:
 			beat := h.defaultHeartbeat()
-			if msg.stop {
+			switch {
+			case msg.stop:
 				return
-			} else if msg.processTerminate {
+			case msg.processTerminate:
 				beat.Code = hb.HeartbeatCode_PROCESS_TERMINATION
 				beat.Error = msg.err
-			} else if msg.overwritten {
+			case msg.overwritten:
 				beat.Code = hb.HeartbeatCode_OVERWRITTEN
 				beat.Error = msg.err
-			} else {
+			default:
 				h.opts.errorFn(fmt.Errorf(
 					"invalid heartbeatMsg received, one of stop|processTerminate|overwritten must be set. Received: %+v", msg))
 				return
