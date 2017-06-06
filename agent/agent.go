@@ -45,18 +45,18 @@ import (
 )
 
 const (
-	defaultReportInterval       = 5 * time.Second
-	defaultHeartbeatConnTimeout = time.Minute
-	defaultTestCanaryPrefix     = "test-canary-file"
+	defaultReportInterval              = 5 * time.Second
+	defaultHeartbeatConnTimeout        = time.Minute
+	defaultTestCanaryPrefix            = "test-canary-file"
+	reasonTeardownHeartbeat            = "remote agent received Teardown(), turning off heartbeating"
+	reasonSetupInitializeHostResources = "unable to initialize host resources, turning off heartbeating"
 )
 
 var (
-	errProcessMonitorNotDefined     = fmt.Errorf("process monitor not defined")
-	errTeardownHeartbeat            = fmt.Errorf("remote agent received Teardown(), turning off heartbeating")
-	errSetupInitializeHostResources = fmt.Errorf("unable to initialize host resources, turning off heartbeating")
-	errHeartbeatSendingTimedout     = fmt.Errorf("heartbeat sending timed out, remote agent reset")
-	errNoValidTargetsSpecified      = fmt.Errorf("no valid target destinations specified")
-	errOnlyDataFileMultiTarget      = fmt.Errorf("multiple targets are only supported for data files")
+	errProcessMonitorNotDefined = fmt.Errorf("process monitor not defined")
+	errHeartbeatSendingTimedout = fmt.Errorf("heartbeat sending timed out, remote agent reset")
+	errNoValidTargetsSpecified  = fmt.Errorf("no valid target destinations specified")
+	errOnlyDataFileMultiTarget  = fmt.Errorf("multiple targets are only supported for data files")
 )
 
 type opAgent struct {
@@ -206,7 +206,7 @@ func (o *opAgent) onProcessTerminate(err error) {
 	}
 	o.logger.Warnf("%v", err)
 	if stopping := atomic.LoadInt32(&o.stopping); stopping == 0 && o.heartbeater != nil {
-		o.heartbeater.notifyProcessTermination(err)
+		o.heartbeater.notifyProcessTermination(err.Error())
 	}
 	atomic.StoreInt32(&o.running, 0)
 }
@@ -276,13 +276,13 @@ func (o *opAgent) stopWithLock() error {
 	return nil
 }
 
-func (o *opAgent) resetWithLock(heartbeatNotification error) error {
+func (o *opAgent) resetWithLock(reason string) error {
 	var multiErr xerrors.MultiError
 
 	if o.heartbeater != nil {
 		o.logger.Infof("stopping heartbeating")
-		if heartbeatNotification != nil {
-			o.heartbeater.notifyOverwrite(heartbeatNotification)
+		if reason != "" {
+			o.heartbeater.notifyOverwrite(reason)
 		}
 		multiErr = multiErr.Add(o.heartbeater.close())
 		o.heartbeater = nil
@@ -320,7 +320,7 @@ func (o *opAgent) Teardown(ctx context.Context, request *m3em.TeardownRequest) (
 	o.Lock()
 	defer o.Unlock()
 
-	if err := o.resetWithLock(errTeardownHeartbeat); err != nil {
+	if err := o.resetWithLock(reasonTeardownHeartbeat); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "unable to teardown: %v", err)
 	}
 
@@ -354,7 +354,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 
 	if o.isSetupWithLock() {
 		// reset agent
-		msg := fmt.Errorf("heartbeating being overwritten by new setup request: %+v", *request)
+		msg := fmt.Sprintf("heartbeating being overwritten by new setup request: %+v", *request)
 		if err := o.resetWithLock(msg); err != nil {
 			return nil, grpc.Errorf(codes.Aborted, "unable to reset: %v", err)
 		}
@@ -370,7 +370,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 	// initialize any resources needed on the host
 	o.logger.Infof("initializing host resources")
 	if err := o.opts.InitHostResourcesFn()(); err != nil {
-		o.resetWithLock(errSetupInitializeHostResources) // release any resources
+		o.resetWithLock(reasonSetupInitializeHostResources) // release any resources
 		return nil, grpc.Errorf(codes.Internal, "unable to initialize host resources: %v", err)
 	}
 
@@ -386,7 +386,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 		}
 		beater, err := newHeartbeater(o, opts, o.opts.InstrumentOptions())
 		if err != nil {
-			o.resetWithLock(errSetupInitializeHostResources) // release any resources
+			o.resetWithLock(reasonSetupInitializeHostResources) // release any resources
 			return nil, grpc.Errorf(codes.Aborted, "unable to start heartbeating process: %v", err)
 		}
 		o.heartbeater = beater
@@ -400,7 +400,7 @@ func (o *opAgent) Setup(ctx context.Context, request *m3em.SetupRequest) (*m3em.
 func (o *opAgent) heartbeatingTimeout(lastHb time.Time) {
 	o.logger.Warnf("heartbeat sending timed out, resetting agent")
 	o.Lock()
-	err := o.resetWithLock(nil) // nil indicates we don't want to send a heartbeat
+	err := o.resetWithLock("") // "" indicates we don't want to send a heartbeat
 	o.Unlock()
 	if err == nil {
 		o.logger.Infof("successfully reset agent")
@@ -413,7 +413,7 @@ func (o *opAgent) heartbeatInternalError(err error) {
 	o.logger.Warnf("received unknown error whilst heartbeat, err=%v", err)
 	o.logger.Warnf("resetting agent")
 	o.Lock()
-	err = o.resetWithLock(err)
+	err = o.resetWithLock(err.Error())
 	o.Unlock()
 	if err == nil {
 		o.logger.Infof("successfully reset agent")

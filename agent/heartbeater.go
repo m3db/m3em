@@ -135,10 +135,10 @@ func (h *heatbeater) heartbeatLoop(d time.Duration) {
 				return
 			} else if msg.processTerminate {
 				beat.Code = hb.HeartbeatCode_PROCESS_TERMINATION
-				beat.Error = msg.err.Error()
+				beat.Error = msg.err
 			} else if msg.overwritten {
 				beat.Code = hb.HeartbeatCode_OVERWRITTEN
-				beat.Error = msg.err.Error()
+				beat.Error = msg.err
 			} else {
 				h.opts.errorFn(fmt.Errorf(
 					"invalid heartbeatMsg received, one of stop|processTerminate|overwritten must be set. Received: %+v", msg))
@@ -213,17 +213,17 @@ func (h *heatbeater) close() error {
 	return err
 }
 
-func (h *heatbeater) notifyProcessTermination(err error) {
+func (h *heatbeater) notifyProcessTermination(reason string) {
 	h.msgChan <- heartbeatMsg{
 		processTerminate: true,
-		err:              err,
+		err:              reason,
 	}
 }
 
-func (h *heatbeater) notifyOverwrite(err error) {
+func (h *heatbeater) notifyOverwrite(reason string) {
 	h.msgChan <- heartbeatMsg{
 		overwritten: true,
-		err:         err,
+		err:         reason,
 	}
 }
 
@@ -231,5 +231,5 @@ type heartbeatMsg struct {
 	stop             bool
 	processTerminate bool
 	overwritten      bool
-	err              error
+	err              string
 }
