@@ -34,7 +34,6 @@ import (
 	"github.com/m3db/m3em/agent"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 )
 
 const (
