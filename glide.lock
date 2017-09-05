@@ -1,5 +1,5 @@
-hash: 6ab8685c5fe45a580d1e4645627e6954aed8250c2889a2e3e3d5c828cc155a59
-updated: 2017-09-01T01:06:19.466223699+08:00
+hash: ad1d4317071a4e342fedc9a8f907627005da64adca1f74ffb6087a1eaac31de7
+updated: 2017-09-05T10:02:50.419161978-04:00
 imports:
 - name: github.com/apache/thrift
   version: 9549b25c77587b29be4e0b5c258221a4ed85d37a
@@ -25,7 +25,7 @@ imports:
   - proto
   - protoc-gen-go
 - name: github.com/m3db/m3cluster
-  version: f1f3976a0b3f5449b22c6e353a9da89b594dc586
+  version: 296a3aed74ef56ee64bf08ead9b358056aa2fb14
   subpackages:
   - generated/proto/placementpb
   - kv
