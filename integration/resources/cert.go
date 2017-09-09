@@ -23,8 +23,6 @@
 package resources
 
 import (
-	"crypto/x509"
-
 	xgrpc "github.com/m3db/m3em/x/grpc"
 
 	"google.golang.org/grpc/credentials"
@@ -38,19 +36,6 @@ const (
 	serverCrtResources = "m3em_server.uberinternal.com.crt"
 	serverKeyResources = "m3em_server.uberinternal.com.key"
 )
-
-func caCertificate() (*x509.CertPool, error) {
-	caCrt, err := Asset(caCrtResource)
-	if err != nil {
-		return nil, err
-	}
-	certPool := x509.NewCertPool()
-	ok := certPool.AppendCertsFromPEM(caCrt)
-	if !ok {
-		return nil, err
-	}
-	return certPool, nil
-}
 
 // ClientTransportCredentials return a DialOption for TLS Client communication
 func ClientTransportCredentials() (credentials.TransportCredentials, error) {
