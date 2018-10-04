@@ -1,3 +1,8 @@
+Migration Warning
+=================
+This repository has been migrated to github.com/m3db/m3. It's contents can be found at github.com/m3db/m3/src/m3em. Follow along there for updates. This repository is marked archived, and will no longer receive any updates.
+
+
 m3em [![GoDoc][doc-img]][doc] [![Build Status][ci-img]][ci] [![Coverage Status][cov-img]][cov]
 ==============================================================================================
 
